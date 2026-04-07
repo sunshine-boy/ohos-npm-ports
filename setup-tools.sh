@@ -21,6 +21,11 @@ tools_err() {
 while read -r name ver; do
     [ -n "$name" ] && [ -n "$ver" ] || continue
     file=$name-$ver-ohos-arm64.tar.gz
+    inst_dir="/opt/$name-$ver-ohos-arm64"
+    if [ -d "$inst_dir" ]; then
+        tools_log "软件包已存在于 $inst_dir，跳过下载与解压: $name (版本 $ver)"
+        continue
+    fi
     url="https://github.com/Harmonybrew/ohos-$name/releases/download/$ver/$file"
     tools_log "准备下载软件包: $name (版本 $ver)"
     tools_log "目标文件: $file"
