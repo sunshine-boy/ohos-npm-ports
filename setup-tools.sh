@@ -10,11 +10,33 @@ git 2.45.2
 python 3.14.3" >/tmp/tools.txt
 
 # 批量下载解压软件包
+tools_log() {
+    printf '%s\n' "[setup-tools] $*"
+}
+
+tools_err() {
+    printf '%s\n' "[setup-tools] ERROR: $*" >&2
+}
+
 while read -r name ver; do
+    [ -n "$name" ] && [ -n "$ver" ] || continue
     file=$name-$ver-ohos-arm64.tar.gz
-    curl -fSLO https://github.com/Harmonybrew/ohos-$name/releases/download/$ver/$file
-    tar -zxf $file -C /opt
-    rm -f $file
+    url="https://github.com/Harmonybrew/ohos-$name/releases/download/$ver/$file"
+    tools_log "准备下载软件包: $name (版本 $ver)"
+    tools_log "目标文件: $file"
+    tools_log "下载地址: $url"
+    if ! curl -fSLO --connect-timeout 60 --retry 3 --retry-delay 2 "$url"; then
+        tools_err "下载失败 — 软件包: $name $ver, 文件: $file"
+        tools_err "请检查网络、代理或 Release 页面是否仍存在该制品。"
+        exit 1
+    fi
+    tools_log "下载成功: $file，开始解压到 /opt"
+    if ! tar -zxf "$file" -C /opt; then
+        tools_err "解压失败 — 文件: $file（已保留在当前目录便于排查）"
+        exit 1
+    fi
+    rm -f "$file"
+    tools_log "已完成: $name $ver"
 done </tmp/tools.txt
 
 # 下载 Node.js
