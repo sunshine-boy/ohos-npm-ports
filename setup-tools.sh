@@ -27,15 +27,20 @@ while read -r name ver; do
         continue
     fi
     url="https://github.com/Harmonybrew/ohos-$name/releases/download/$ver/$file"
-    tools_log "准备下载软件包: $name (版本 $ver)"
-    tools_log "目标文件: $file"
-    tools_log "下载地址: $url"
-    if ! curl -fSLO --connect-timeout 60 --retry 3 --retry-delay 2 "$url"; then
-        tools_err "下载失败 — 软件包: $name $ver, 文件: $file"
-        tools_err "请检查网络、代理或 Release 页面是否仍存在该制品。"
-        exit 1
+    if [ -f "$file" ]; then
+        tools_log "本地已存在压缩包 $file，跳过下载: $name (版本 $ver)"
+    else
+        tools_log "准备下载软件包: $name (版本 $ver)"
+        tools_log "目标文件: $file"
+        tools_log "下载地址: $url"
+        if ! curl -fSLO --connect-timeout 60 --retry 3 --retry-delay 2 "$url"; then
+            tools_err "下载失败 — 软件包: $name $ver, 文件: $file"
+            tools_err "请检查网络、代理或 Release 页面是否仍存在该制品。"
+            exit 1
+        fi
+        tools_log "下载成功: $file"
     fi
-    tools_log "下载成功: $file，开始解压到 /opt"
+    tools_log "开始解压到 /opt: $file"
     if ! tar -zxf "$file" -C /opt; then
         tools_err "解压失败 — 文件: $file（已保留在当前目录便于排查）"
         exit 1
