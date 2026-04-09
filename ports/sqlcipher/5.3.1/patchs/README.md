@@ -2,6 +2,12 @@
 
 对解压后的 `node-sqlcipher-5.3.1/` 根目录执行 `patch -p1`。
 
+## `0002-linux-openssl-libdir.patch`
+
+在 `deps/sqlite3.gyp` 的 Linux `link_settings` 中增加 `library_dirs`，值为 gyp 执行时的 `<!(echo $SQLCIPHER_OPENSSL_LIBDIR)`。  
+`build.sh` 会在 `npm install` 前根据 `OHOS_SDK_OHOS_DIR`（默认 `/opt/ohos-sdk/ohos`）探测 `libcrypto.so` / `libcrypto.a` 所在目录并 `export SQLCIPHER_OPENSSL_LIBDIR`；探测不到时使用 `.`（与普通 Linux 上系统库路径行为一致）。  
+也可在运行构建前手动设置：`export SQLCIPHER_OPENSSL_LIBDIR=/path/to/sysroot/.../usr/lib/aarch64-linux-ohos`。
+
 ## `0001-change-prebuild-framework.patch`
 
 将上游 [@journeyapps/sqlcipher](https://www.npmjs.com/package/@journeyapps/sqlcipher) 使用的 `@mapbox/node-pre-gyp` 安装流改为与本仓库其他原生包一致的 **node-gyp-build + prebuildify**（参见 `ports/sqlite3`）：

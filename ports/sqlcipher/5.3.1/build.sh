@@ -45,11 +45,33 @@ strip_cr_to_lf() {
     return 1
 }
 # Windows / git autocrlf 可能把 package.json 变成 CRLF，patch 会整段匹配失败；打补丁前统一去掉 \r
-for f in package.json binding.gyp lib/sqlite3-binding.js lib/sqlite3.js sqlite3.js; do
+for f in package.json binding.gyp lib/sqlite3-binding.js lib/sqlite3.js sqlite3.js deps/sqlite3.gyp; do
     strip_cr_to_lf "$f"
 done
 
 patch -p1 < ../patchs/0001-change-prebuild-framework.patch
+patch -p1 < ../patchs/0002-linux-openssl-libdir.patch
+
+# 上游 Linux 分支仅写 -lcrypto，依赖默认库路径；鸿蒙/NDK 需在 sysroot 的 usr/lib/<triple> 下才有 libcrypto。
+# 可通过环境变量 SQLCIPHER_OPENSSL_LIBDIR 覆盖；未设置时按常见 OHOS_SDK 布局探测。
+OHOS_ROOT="${OHOS_SDK_OHOS_DIR:-/opt/ohos-sdk/ohos}"
+if [ -z "${SQLCIPHER_OPENSSL_LIBDIR:-}" ]; then
+    for d in \
+        "${OHOS_ROOT}/native/sysroot/usr/lib/aarch64-linux-ohos" \
+        "${OHOS_ROOT}/native/sysroot/usr/lib/aarch64-unknown-linux-ohos" \
+        "${OHOS_ROOT}/native/sysroot/usr/lib/arm-linux-ohos" \
+        "${OHOS_ROOT}/native/llvm/lib/aarch64-linux-ohos"; do
+        if [ -f "${d}/libcrypto.so" ] || [ -f "${d}/libcrypto.a" ]; then
+            SQLCIPHER_OPENSSL_LIBDIR="${d}"
+            break
+        fi
+    done
+fi
+SQLCIPHER_OPENSSL_LIBDIR="${SQLCIPHER_OPENSSL_LIBDIR:-.}"
+export SQLCIPHER_OPENSSL_LIBDIR
+if [ "${SQLCIPHER_OPENSSL_LIBDIR}" != "." ]; then
+    export LDFLAGS="${LDFLAGS:-} -L${SQLCIPHER_OPENSSL_LIBDIR} -Wl,-rpath-link,${SQLCIPHER_OPENSSL_LIBDIR}"
+fi
 
 npm install
 npm run prebuild

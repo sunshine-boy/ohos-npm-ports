@@ -1,0 +1,13 @@
+diff --git a/deps/sqlite3.gyp b/deps/sqlite3.gyp
+--- a/deps/sqlite3.gyp
++++ b/deps/sqlite3.gyp
+@@ -78,6 +78,9 @@
+         'link_settings': {
+           'libraries': [
+             '-lcrypto'
++          ],
++          'library_dirs': [
++            '<!(echo $SQLCIPHER_OPENSSL_LIBDIR)'
+           ]
+         }
+       }]
