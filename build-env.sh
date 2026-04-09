@@ -208,6 +208,34 @@ install_from_atomgit() {
     copy_js_pkg_env_cfg_to_system_init
 }
 
+# 解压 SDK 内 zip（busybox 或系统 unzip）
+ohos_sdk_unzip_one() {
+    zf=$1
+    if command -v busybox >/dev/null 2>&1; then
+        busybox unzip -q -o "$zf"
+    elif command -v unzip >/dev/null 2>&1; then
+        unzip -q -o "$zf"
+    else
+        printf '%s\n' "[build-env] ERROR: 需要 busybox 或 unzip 以解压 ohos-sdk zip" >&2
+        return 1
+    fi
+}
+
+# 官方 tar 常带一层版本目录，zip 实际在 .../<某目录>/ohos/ 下
+ohos_sdk_resolve_ohos_dir() {
+    base=$1
+    if [ -f "$base/$OHOS_SDK_ZIP_NATIVE" ] || [ -f "$base/$OHOS_SDK_ZIP_TC" ]; then
+        printf '%s\n' "$base"
+        return 0
+    fi
+    zpath=$(find /opt/ohos-sdk -type f \( -name "$OHOS_SDK_ZIP_NATIVE" -o -name "$OHOS_SDK_ZIP_TC" \) 2>/dev/null | head -n 1)
+    if [ -n "$zpath" ]; then
+        dirname "$zpath"
+        return 0
+    fi
+    printf '%s\n' "$base"
+}
+
 # Node.js、/bin 软链、ohos-sdk 与 llvm 封装（已存在则跳过下载，仍完成 /bin 与封装配置）
 install_node_ohos_sdk_and_bins() {
     printf '%s\n' "[build-env] 检查并完成 Node、ohos-sdk 与 /bin 工具链配置..."
@@ -231,16 +259,31 @@ install_node_ohos_sdk_and_bins() {
         cd - >/dev/null
     done
 
-    if [ -x "$OHOS_SDK_LLVM_CLANG" ]; then
+    oh_sdk_ohos=$OHOS_SDK_OHOS_DIR
+    oh_sdk_clang="$OHOS_SDK_LLVM_CLANG"
+
+    # 默认路径不对时（版本子目录、或仅残留已解压的 LLVM），在 /opt/ohos-sdk 下定位 clang
+    if [ ! -f "$oh_sdk_clang" ]; then
+        cfound=$(find /opt/ohos-sdk -type f -name clang 2>/dev/null | grep '/native/llvm/bin/clang$' | head -n 1)
+        if [ -n "$cfound" ]; then
+            oh_sdk_clang=$cfound
+            oh_sdk_ohos=$(dirname "$(dirname "$(dirname "$cfound")")")
+        fi
+    fi
+
+    if [ -f "$oh_sdk_clang" ]; then
         printf '%s\n' "[build-env] ohos-sdk（LLVM）已就绪，跳过 SDK 归档下载与 zip 解压"
     else
-        if [ -f "$OHOS_SDK_OHOS_DIR/$OHOS_SDK_ZIP_NATIVE" ] || [ -f "$OHOS_SDK_OHOS_DIR/$OHOS_SDK_ZIP_TC" ]; then
-            printf '%s\n' "[build-env] 检测到 SDK zip，仅解压 native/toolchains（不下载归档）"
-            cd "$OHOS_SDK_OHOS_DIR"
-            [ -f "$OHOS_SDK_ZIP_NATIVE" ] && busybox unzip -q "$OHOS_SDK_ZIP_NATIVE" # 官方命名 x64，实为 arm64
-            [ -f "$OHOS_SDK_ZIP_TC" ] && busybox unzip -q "$OHOS_SDK_ZIP_TC"
-            rm -rf ./*.zip
-            cd - >/dev/null
+        oh_sdk_ohos=$(ohos_sdk_resolve_ohos_dir "$OHOS_SDK_OHOS_DIR")
+        oh_sdk_clang="$oh_sdk_ohos/native/llvm/bin/clang"
+        if [ -f "$oh_sdk_ohos/$OHOS_SDK_ZIP_NATIVE" ] || [ -f "$oh_sdk_ohos/$OHOS_SDK_ZIP_TC" ]; then
+            printf '%s\n' "[build-env] 检测到 SDK zip（目录: $oh_sdk_ohos），仅解压 native/toolchains（不下载归档）"
+            (
+                cd "$oh_sdk_ohos" || exit 1
+                [ -f "$OHOS_SDK_ZIP_NATIVE" ] && ohos_sdk_unzip_one "$OHOS_SDK_ZIP_NATIVE" # 官方命名 x64，实为 arm64
+                [ -f "$OHOS_SDK_ZIP_TC" ] && ohos_sdk_unzip_one "$OHOS_SDK_ZIP_TC"
+                rm -rf ./*.zip 2>/dev/null || true
+            )
         else
             printf '%s\n' "[build-env] 下载并解压 ohos-sdk 归档..."
             (
@@ -250,21 +293,35 @@ install_node_ohos_sdk_and_bins() {
                 tar -zxf ohos-sdk.tar.gz -C /opt/ohos-sdk
                 rm -f ohos-sdk.tar.gz
             )
-            cd "$OHOS_SDK_OHOS_DIR"
-            [ -f "$OHOS_SDK_ZIP_NATIVE" ] && busybox unzip -q "$OHOS_SDK_ZIP_NATIVE"
-            [ -f "$OHOS_SDK_ZIP_TC" ] && busybox unzip -q "$OHOS_SDK_ZIP_TC"
-            rm -rf ./*.zip
-            cd - >/dev/null
+            oh_sdk_ohos=$(ohos_sdk_resolve_ohos_dir "$OHOS_SDK_OHOS_DIR")
+            oh_sdk_clang="$oh_sdk_ohos/native/llvm/bin/clang"
+            if [ ! -f "$oh_sdk_ohos/$OHOS_SDK_ZIP_NATIVE" ] && [ ! -f "$oh_sdk_ohos/$OHOS_SDK_ZIP_TC" ]; then
+                printf '%s\n' "[build-env] ERROR: 解压归档后未找到 SDK zip（期望含 $OHOS_SDK_ZIP_NATIVE）" >&2
+                find /opt/ohos-sdk -maxdepth 4 -type f -name "*.zip" 2>/dev/null | head -20 >&2 || true
+                return 1
+            fi
+            (
+                cd "$oh_sdk_ohos" || exit 1
+                [ -f "$OHOS_SDK_ZIP_NATIVE" ] && ohos_sdk_unzip_one "$OHOS_SDK_ZIP_NATIVE"
+                [ -f "$OHOS_SDK_ZIP_TC" ] && ohos_sdk_unzip_one "$OHOS_SDK_ZIP_TC"
+                rm -rf ./*.zip 2>/dev/null || true
+            )
         fi
     fi
 
-    if [ ! -x "$OHOS_SDK_LLVM_CLANG" ]; then
-        printf '%s\n' "[build-env] ERROR: ohos-sdk LLVM 仍未就绪: $OHOS_SDK_LLVM_CLANG" >&2
-        return 1
+    # 与 setup-tools.sh 一致：官方 LLVM 常无执行位，须先 chmod 再检测 -x
+    if [ -d "$oh_sdk_ohos/native/llvm/bin" ]; then
+        chmod 0755 "$oh_sdk_ohos/native/llvm/bin/"* 2>/dev/null || true
+    fi
+    if [ -f "$oh_sdk_ohos/toolchains/lib/binary-sign-tool" ]; then
+        chmod 0755 "$oh_sdk_ohos/toolchains/lib/binary-sign-tool"
     fi
 
-    chmod 0755 /opt/ohos-sdk/ohos/native/llvm/bin/*
-    chmod 0755 /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool
+    if [ ! -x "$oh_sdk_clang" ]; then
+        printf '%s\n' "[build-env] ERROR: ohos-sdk LLVM 仍未就绪: $oh_sdk_clang（oh_sdk_ohos=$oh_sdk_ohos）" >&2
+        ls -la "$oh_sdk_ohos" 2>/dev/null | head -30 >&2 || true
+        return 1
+    fi
 
     essential_tools="clang
 clang++
@@ -284,12 +341,12 @@ llvm-strip"
     for executable in $essential_tools; do
         cat <<EOF >"/bin/$executable"
 #!/bin/sh
-exec /opt/ohos-sdk/ohos/native/llvm/bin/$executable "\$@"
+exec "$oh_sdk_ohos/native/llvm/bin/$executable" "\$@"
 EOF
         chmod 0755 "/bin/$executable"
     done
 
-    ln -sf /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool /bin/binary-sign-tool
+    ln -sf "$oh_sdk_ohos/toolchains/lib/binary-sign-tool" /bin/binary-sign-tool
 
     cd /bin
     ln -sf clang cc
