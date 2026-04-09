@@ -15,13 +15,13 @@ diff --git a/package.json b/package.json
    "repository": {
      "type": "git",
 -    "url": "git+https://github.com/errorrik/js-native.git"
-+    "url": "git+https://github.com/ohos-npm-ports/ohos-npm-ports.git"
++    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
    },
    "author": "",
    "license": "MIT",
    "bugs": {
 -    "url": "https://github.com/errorrik/js-native/issues"
-+    "url": "https://github.com/ohos-npm-ports/ohos-npm-ports/issues"
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
    },
    "homepage": "https://github.com/errorrik/js-native#readme"
  }
