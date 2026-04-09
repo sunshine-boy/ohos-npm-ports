@@ -188,6 +188,83 @@ install_from_atomgit() {
     copy_js_pkg_env_cfg_to_system_init
 }
 
+# Node.js、/bin 软链、ohos-sdk 与 llvm 封装（与 setup-tools.sh:52-125 一致；下载在 /tmp）
+install_node_ohos_sdk_and_bins() {
+    printf '%s\n' "[build-env] 安装 Node.js、ohos-sdk 及 /bin 工具链封装..."
+    (
+        cd /tmp || exit 1
+        curl -fSLO https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz
+        tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
+        rm -f node-v24.2.0-openharmony-arm64.tar.gz
+    )
+
+    find /opt -maxdepth 2 -type d | grep "arm64/bin$" | while IFS= read -r dir; do
+        cd "$dir"
+        ls | /opt/busybox-1.37.0-ohos-arm64/bin/busybox xargs -I {} sh -c "ln -s -f $(realpath {}) /bin/{}"
+        cd - >/dev/null
+    done
+
+    (
+        cd /tmp || exit 1
+        sdk_download_url="https://cidownload.openharmony.cn/version/Master_Version/ohos-sdk-public_ohos/20260108_020526/version-Master_Version-ohos-sdk-public_ohos-20260108_020526-ohos-sdk-public_ohos.tar.gz"
+        curl -fSL -o ohos-sdk.tar.gz "$sdk_download_url"
+        mkdir -p /opt/ohos-sdk
+        tar -zxf ohos-sdk.tar.gz -C /opt/ohos-sdk
+        rm -f ohos-sdk.tar.gz
+    )
+    cd /opt/ohos-sdk/ohos
+    busybox unzip -q native-ohos-x64-6.1.0.27-Canary1.zip # 这是官方的命名错误，这里写 x64，实际上里面的制品是 arm64
+    busybox unzip -q toolchains-ohos-x64-6.1.0.27-Canary1.zip
+    rm -rf ./*.zip
+    cd - >/dev/null
+
+    chmod 0755 /opt/ohos-sdk/ohos/native/llvm/bin/*
+    chmod 0755 /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool
+
+    essential_tools="clang
+clang++
+ld.lld
+lldb
+llvm-addr2line
+llvm-ar
+llvm-cxxfilt
+llvm-nm
+llvm-objcopy
+llvm-objdump
+llvm-ranlib
+llvm-readelf
+llvm-size
+llvm-strip"
+
+    for executable in $essential_tools; do
+        cat <<EOF >"/bin/$executable"
+#!/bin/sh
+exec /opt/ohos-sdk/ohos/native/llvm/bin/$executable "\$@"
+EOF
+        chmod 0755 "/bin/$executable"
+    done
+
+    ln -s /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool /bin/binary-sign-tool
+
+    cd /bin
+    ln -s clang cc
+    ln -s clang gcc
+    ln -s clang++ c++
+    ln -s clang++ g++
+    ln -s ld.lld ld
+    ln -s llvm-addr2line addr2line
+    ln -s llvm-ar ar
+    ln -s llvm-cxxfilt c++filt
+    ln -s llvm-nm nm
+    ln -s llvm-objcopy objcopy
+    ln -s llvm-objdump objdump
+    ln -s llvm-ranlib ranlib
+    ln -s llvm-readelf readelf
+    ln -s llvm-size size
+    ln -s llvm-strip strip
+    cd - >/dev/null
+}
+
 missingf="/tmp/build-env-missing-$$"
 neededf="/tmp/build-env-needed-$$"
 trap 'rm -f "$missingf" "$neededf"' EXIT INT HUP
@@ -196,6 +273,7 @@ collect_missing "$missingf" ""
 
 if [ ! -s "$missingf" ]; then
     printf '%s\n' "[build-env] 环境检测通过，所需命令均已可用。"
+    install_node_ohos_sdk_and_bins
     exit 0
 fi
 
@@ -230,4 +308,5 @@ if [ -s "$missingf" ]; then
 fi
 
 printf '%s\n' "[build-env] 补装后复检通过，所需命令均已可用。"
+install_node_ohos_sdk_and_bins
 exit 0
