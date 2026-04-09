@@ -9,7 +9,7 @@
 至少修改 `package.json`：
 
 - `name` → `@tetcl/electron-active-window`
-- `version` → `0.0.6-2`（与发布版本一致；port rev 递增时同步修改）
+- `version` → `0.0.6-3`（与发布版本一致；port rev 递增时同步修改）
 - `repository` / `bugs` → 维护仓库（与 js-native 一致：`git+https://github.com/sunshine-boy/ohos-npm-ports.git`）
 
 生成方式示例：
@@ -28,7 +28,8 @@ git diff > ../patchs/0001-update-package-json.patch
 
 - 加载：`index.js` → `node-gyp-build`
 - 脚本：`prebuild` → `prebuildify --napi`，`install` → `node-gyp-build`
-- `binding.gyp`：`eaw_oh_port` 在 **`ELECTRON_ACTIVE_WINDOW_OH_PORT=1`** 或 **`process.execPath` 含 `openharmony`**（典型为 OpenHarmony Node 安装路径）时为 1，与 `OS=="openharmony"` 时走 OpenHarmony 存根；`OS=="linux"` 且 `eaw_oh_port!=1` 时仍编 X11。`build.sh` 仍会导出 `ELECTRON_ACTIVE_WINDOW_OH_PORT=1` 作为显式开关。Linux 桌面路径下 `-l*` 仅通过 `libraries` 链接，不再写入 `cflags`，避免 `-Wunused-command-line-argument`。`NODE_API_MODULE(wm, …)`（故 `build.sh` 将 `wm.node` 重命名为 `@tetcl+electron-active-window.node`）
+- `binding.gyp`：`eaw_oh_port` 由 **`scripts/gyp-is-openharmony-port.js`** 判定（在 gyp 阶段执行）：显式 **`ELECTRON_ACTIVE_WINDOW_OH_PORT=1`**、`process.platform === 'openharmony'`、`execPath` 含 `openharmony`、**`CC`/`CXX` 等含 `linux-ohos` / `aarch64-linux-ohos` 等 OH 工具链**、**`/etc/os-release`（及 `/usr/etc/os-release`）** 中 `ID=openharmony` / `ID=ohos` 或 `NAME=` 含 OpenHarmony、**`/proc/version` 含 openharmony/ohos** 时输出 1，走 **`cppsrc/openharmony/windowopenharmony.cpp`**（无 X11）；`OS=="linux"` 且 `eaw_oh_port!=1` 时仍编 **X11**（Windows/mac 分支不变）。`build.sh` 仍会导出 `ELECTRON_ACTIVE_WINDOW_OH_PORT=1` 作为 CI 显式开关。Linux 桌面路径下 `-l*` 仅通过 `libraries` 链接。`NODE_API_MODULE(wm, …)`（故 `build.sh` 将 `wm.node` 重命名为 `@tetcl+electron-active-window.node`）
+- `cppsrc/openharmony/windowopenharmony.cpp`：OpenHarmony 上返回与 Linux 成功路径一致的字段（无 `error`），`windowName`/`windowClass` 尽力填入 **`/proc/self/cmdline` 的 argv0**（当前 Node 进程名，便于标识运行环境；系统级「前台应用」需后续接系统 WM/Ability API）
 - `files`：包含 `prebuilds/`
 
 ## 校验

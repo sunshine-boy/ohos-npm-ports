@@ -1,5 +1,5 @@
 diff --git a/binding.gyp b/binding.gyp
-index 574511f..597d4ef 100644
+index 574511f..9fb2423 100644
 --- a/binding.gyp
 +++ b/binding.gyp
 @@ -2,19 +2,30 @@
@@ -7,7 +7,7 @@ index 574511f..597d4ef 100644
      {
        "target_name": "wm",
 +      "variables": {
-+        "eaw_oh_port%": "<!(node -p \"(process.env.ELECTRON_ACTIVE_WINDOW_OH_PORT==='1'||String(process.execPath).toLowerCase().includes('openharmony'))?'1':'0'\")"
++        "eaw_oh_port%": "<!(node scripts/gyp-is-openharmony-port.js)"
 +      },
        "sources": [ "cppsrc/main.cpp"],
        "cflags": ["-fexceptions -std=c++11"],
@@ -72,25 +72,57 @@ index 99b55c3..aad16cc 100644
 +NODE_API_MODULE(wm, InitAll)
 diff --git a/cppsrc/openharmony/windowopenharmony.cpp b/cppsrc/openharmony/windowopenharmony.cpp
 new file mode 100644
-index 0000000..94053b9
+index 0000000..e97064f
 --- /dev/null
 +++ b/cppsrc/openharmony/windowopenharmony.cpp
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,58 @@
 +#include "windowopenharmony.h"
++
++#include <cstdio>
++#include <cstring>
++#include <string>
++
++namespace {
++
++bool readProcCmdlineArgv0(std::string* out) {
++  if (!out) {
++    return false;
++  }
++  char buf[1024];
++  std::memset(buf, 0, sizeof(buf));
++  FILE* f = std::fopen("/proc/self/cmdline", "rb");
++  if (!f) {
++    return false;
++  }
++  const size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
++  std::fclose(f);
++  if (n == 0) {
++    return false;
++  }
++  *out = std::string(buf);
++  return true;
++}
++
++}  // namespace
 +
 +Napi::Object windowopenharmony::getActiveWindowWrapped(const Napi::CallbackInfo& info) {
 +  Napi::Env env = info.Env();
 +  Napi::Object obj = Napi::Object::New(env);
 +
 +  obj.Set("os", "openharmony");
-+  obj.Set("windowClass", "");
-+  obj.Set("windowName", "");
 +  obj.Set("windowDesktop", "0");
 +  obj.Set("windowType", "0");
 +  obj.Set("windowPid", "0");
 +  obj.Set("idleTime", "0");
-+  obj.Set("error", "1");
-+  obj.Set("errorMessage", "electron-active-window: OpenHarmony is not supported yet");
++
++  std::string argv0;
++  if (readProcCmdlineArgv0(&argv0)) {
++    obj.Set("windowName", argv0);
++    obj.Set("windowClass", argv0);
++  } else {
++    obj.Set("windowName", "");
++    obj.Set("windowClass", "");
++  }
 +
 +  return obj;
 +}
@@ -127,7 +159,7 @@ index 36baf7f..84bc4be 100644
  const exec = require('child_process').exec;
  const fs = require('fs');
 diff --git a/package.json b/package.json
-index b099609..3d361cb 100644
+index b099609..c9e5531 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,11 +1,11 @@
@@ -135,7 +167,7 @@ index b099609..3d361cb 100644
 -  "name": "electron-active-window",
 -  "version": "0.0.6",
 +  "name": "@tetcl/electron-active-window",
-+  "version": "0.0.6-2",
++  "version": "0.0.6-3",
    "author": "Yves Hoppe <contact@bytee.net> (https://bytee.net), nullx <mail@nullx.me> (nullx.me)",
    "homepage": "https://bytee.net, https://nullx.me",
    "repository": {
@@ -145,7 +177,7 @@ index b099609..3d361cb 100644
    },
    "keywords": [
      "current-window",
-@@ -19,18 +19,36 @@
+@@ -19,18 +19,37 @@
    "gypfile": true,
    "scripts": {
      "preinstall": "node setup.js",
@@ -178,6 +210,7 @@ index b099609..3d361cb 100644
 +  "files": [
 +    "index.js",
 +    "binding.gyp",
++    "scripts/",
 +    "cppsrc/",
 +    "mac/",
 +    "prebuilds/",
@@ -186,3 +219,88 @@ index b099609..3d361cb 100644
 +    "sample.js"
 +  ]
  }
+diff --git a/scripts/gyp-is-openharmony-port.js b/scripts/gyp-is-openharmony-port.js
+new file mode 100644
+index 0000000..018ce81
+--- /dev/null
++++ b/scripts/gyp-is-openharmony-port.js
+@@ -0,0 +1,79 @@
++'use strict';
++/**
++ * Used from binding.gyp: eaw_oh_port% → "1" when this build targets OpenHarmony
++ * (on-device or OH SDK cross-compile), so we do not compile the Linux/X11 sources.
++ *
++ * Desktop Linux + X11: prints "0" so windowlinux.cpp + -lX11/-lXss/-lxcb stay enabled.
++ */
++const fs = require('fs');
++
++function print(v) {
++  process.stdout.write(v);
++}
++
++if (process.env.ELECTRON_ACTIVE_WINDOW_OH_PORT === '1') {
++  print('1');
++  process.exit(0);
++}
++
++if (process.platform === 'openharmony') {
++  print('1');
++  process.exit(0);
++}
++
++const execPath = String(process.execPath).toLowerCase();
++if (execPath.includes('openharmony')) {
++  print('1');
++  process.exit(0);
++}
++
++const tool = [
++  process.env.CC,
++  process.env.CXX,
++  process.env.npm_config_cc,
++  process.env.npm_config_cxx,
++  process.env.TARGET_CC,
++  process.env.TARGET_CXX,
++]
++  .filter(Boolean)
++  .join(' ')
++  .toLowerCase();
++
++if (
++  tool.includes('linux-ohos') ||
++  tool.includes('unknown-linux-ohos') ||
++  tool.includes('-ohos-clang') ||
++  tool.includes('aarch64-linux-ohos')
++) {
++  print('1');
++  process.exit(0);
++}
++
++for (const f of ['/etc/os-release', '/usr/etc/os-release']) {
++  try {
++    const s = fs.readFileSync(f, 'utf8');
++    const lower = s.toLowerCase();
++    if (/^id=openharmony\b/m.test(lower) || /^id=ohos\b/m.test(lower)) {
++      print('1');
++      process.exit(0);
++    }
++    if (/^name=.*openharmony/m.test(lower) || /^name=.*open harmony/m.test(lower)) {
++      print('1');
++      process.exit(0);
++    }
++  } catch (_) {
++    /* ignore */
++  }
++}
++
++try {
++  const ver = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
++  if (ver.includes('openharmony') || ver.includes('ohos')) {
++    print('1');
++    process.exit(0);
++  }
++} catch (_) {
++  /* ignore */
++}
++
++print('0');

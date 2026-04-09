@@ -43,7 +43,7 @@ strip_cr_to_lf() {
     printf '%s\n' "[electron-active-window] ERROR: 无法去除 CRLF（需要 tr、sed 或 awk 之一）" >&2
     return 1
 }
-for f in package.json index.js binding.gyp cppsrc/main.cpp setup.js; do
+for f in package.json index.js binding.gyp cppsrc/main.cpp setup.js scripts/gyp-is-openharmony-port.js; do
     strip_cr_to_lf "$f"
 done
 
