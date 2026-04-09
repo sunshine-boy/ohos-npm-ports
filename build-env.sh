@@ -5,6 +5,21 @@
 set -e
 
 ATOMGIT_RELEASE="https://atomgit.com/CodexBai/ohos-temporary-software/releases/download/1.0.0"
+INIT_ENV_CFG_NAME="js_pkg_oh_env_arm.cfg"
+INIT_ENV_CFG_DEST_DIR="/system/etc/init"
+
+# 将仓库内 init 环境配置拷贝到系统 init 目录（解压制品后由 install_from_atomgit 调用）
+copy_js_pkg_env_cfg_to_system_init() {
+    here=$(CDPATH= cd "$(dirname "$0")" && pwd) || exit 1
+    src="$here/$INIT_ENV_CFG_NAME"
+    if [ ! -f "$src" ]; then
+        printf '%s\n' "[build-env] ERROR: 未找到配置文件: $src" >&2
+        exit 1
+    fi
+    mkdir -p "$INIT_ENV_CFG_DEST_DIR"
+    cp "$src" "$INIT_ENV_CFG_DEST_DIR/"
+    printf '%s\n' "[build-env] 已复制 $INIT_ENV_CFG_NAME -> $INIT_ENV_CFG_DEST_DIR/"
+}
 
 # 尽力读取单行版本信息（--version / -version / -V，合并 stderr）
 get_ver_line() {
@@ -170,6 +185,7 @@ install_from_atomgit() {
         printf '%s\n' "[build-env] 已解压到 /opt，配置 PATH: /opt/$pkg-$ver-ohos-arm64/bin"
         export PATH="/opt/$pkg-$ver-ohos-arm64/bin:$PATH"
     done < "$list"
+    copy_js_pkg_env_cfg_to_system_init
 }
 
 missingf="/tmp/build-env-missing-$$"
