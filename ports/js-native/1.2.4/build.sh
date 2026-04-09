@@ -15,12 +15,14 @@ PORT_REV="1"
 UPSTREAM_TARBALL_URL="https://registry.npmjs.org/js-native/-/js-native-1.2.4.tgz"
 UPSTREAM_PREBUILDS_SOURCE="https://registry.npmjs.org/js-native/-/js-native-1.2.4.tgz"
 OH_NODE_PATH="prebuilds/openharmony-arm64"
+# npm registry tgz 解压后目录名固定为 package/，不是包名
+SRC_DIR="package"
 
-# 下载上游源码 tarball → 解压 → `patch -p1 < ../patchs/xxxx.patch`
-rm -rf "${PKG_NAME}"
+# 下载上游 tarball → 解压 → 打 patch
+rm -rf "${SRC_DIR}"
 curl -fsSL "${UPSTREAM_TARBALL_URL}" -o "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"
 tar -zxf "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"
-cd "${PKG_NAME}"
+cd "${SRC_DIR}"
 patch -p1 < ../patchs/0001-update-package-json.patch
 cd ..
 rm -f "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"

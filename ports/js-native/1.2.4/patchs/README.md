@@ -8,9 +8,9 @@
 
 至少修改 `package.json`：
 
-- `name` → `@ohos-npm-ports/js-native`
+- `name` → `@tetclbxm/js-native`
 - `version` → `1.2.4-1`（与发布版本一致）
-- `repository` / `bugs`（建议）→ 维护仓库，如 `https://github.com/ohos-npm-ports/ohos-npm-ports`
+- `repository` / `bugs`（建议）→ 维护仓库（本 port 保持现有链接，未随组织名修改）
 
 生成方式示例：
 
