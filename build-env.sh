@@ -130,7 +130,7 @@ TOOLS_LIST="busybox	busybox	1.37.0
 make	make	4.4.1
 cmake	cmake	4.1.2
 vim	vim	9.2.0150
-git	git	2.45.2
+git	git	2.53.0
 python	python	3.14.3"
 
 # $1 输出仍缺失的「cmd<TAB>pkg<TAB>ver」
