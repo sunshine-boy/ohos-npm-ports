@@ -8,16 +8,19 @@ set -e
 source ../../../build-env.sh
 source ../../../setup-env.sh
 
-PKG="js-native"
+# 可变项
+PKG_NAME="js-native"
 UPSTREAM_VERSION="1.2.4"
-SRC_DIR="package"
-ARCHIVE_URL="https://registry.npmjs.org/js-native/-/js-native-1.2.4.tgz"
-TARBALL="js-native-1.2.4.tgz"
+PORT_REV="1"
+UPSTREAM_TARBALL_URL="https://registry.npmjs.org/js-native/-/js-native-1.2.4.tgz"
+UPSTREAM_PREBUILDS_SOURCE="https://registry.npmjs.org/js-native/-/js-native-1.2.4.tgz"
+OH_NODE_PATH="prebuilds/openharmony-arm64"
 
-rm -rf "${SRC_DIR}"
-curl -fsSL "${ARCHIVE_URL}" -o "${TARBALL}"
-tar -zxf "${TARBALL}"
-cd "${SRC_DIR}"
+# 下载上游源码 tarball → 解压 → `patch -p1 < ../patchs/xxxx.patch`
+rm -rf "${PKG_NAME}"
+curl -fsSL "${UPSTREAM_TARBALL_URL}" -o "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"
+tar -zxf "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"
+cd "${PKG_NAME}"
 patch -p1 < ../patchs/0001-update-package-json.patch
 cd ..
-rm -f "${TARBALL}"
+rm -f "${PKG_NAME}-${UPSTREAM_VERSION}.tgz"
