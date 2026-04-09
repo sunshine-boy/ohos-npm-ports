@@ -2,7 +2,7 @@
 set -e
 
 # 准备编译环境
-source ../../../setup-tools.sh
+source ../../../build-env.sh
 source ../../../setup-env.sh
 
 # 准备源码
