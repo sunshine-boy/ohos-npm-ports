@@ -23,8 +23,15 @@ curl -fsSL "${UPSTREAM_TARBALL_URL}" -o "${TARBALL}"
 tar -zxf "${TARBALL}"
 cd "${SRC_DIR}"
 
-# 上游部分文件可能为 CRLF，避免 patch 不匹配
-perl -pi -e 's/\r$//' package.json index.js binding.gyp cppsrc/main.cpp setup.js 2>/dev/null || true
+# 上游 npm 包多为 CRLF；Harmony/精简镜像里常无 perl，perl 失败时 patch 会整段不匹配
+strip_cr_to_lf() {
+    f=$1
+    [ -f "$f" ] || return 0
+    tr -d '\r' <"$f" >"$f.be-lf.tmp" && mv "$f.be-lf.tmp" "$f"
+}
+for f in package.json index.js binding.gyp cppsrc/main.cpp setup.js; do
+    strip_cr_to_lf "$f"
+done
 
 patch -p1 < ../patchs/0001-change-prebuild-framework.patch
 
