@@ -1,14 +1,13 @@
 diff --git a/binding.gyp b/binding.gyp
-index 574511f..0ac87af 100755
+index 574511f..597d4ef 100644
 --- a/binding.gyp
 +++ b/binding.gyp
-@@ -1,16 +1,27 @@
- {
+@@ -2,19 +2,30 @@
    "targets": [
      {
        "target_name": "wm",
 +      "variables": {
-+        "eaw_oh_port%": "<!(node -p \"process.env.ELECTRON_ACTIVE_WINDOW_OH_PORT==='1'?'1':'0'\")"
++        "eaw_oh_port%": "<!(node -p \"(process.env.ELECTRON_ACTIVE_WINDOW_OH_PORT==='1'||String(process.execPath).toLowerCase().includes('openharmony'))?'1':'0'\")"
 +      },
        "sources": [ "cppsrc/main.cpp"],
        "cflags": ["-fexceptions -std=c++11"],
@@ -30,12 +29,22 @@ index 574511f..0ac87af 100755
                 "-lXss",
                 "-lxcb"
               ],
-              'cflags': ["-fexceptions -std=c++11 -lX11 -lXext -lXss"],
+-             'cflags': ["-fexceptions -std=c++11 -lX11 -lXext -lXss"],
+-             'cflags_cc': ["-fexceptions -lX11 -lXext -lXss"],
++             'cflags': ["-fexceptions -std=c++11"],
++             'cflags_cc': ["-fexceptions"],
+            }
+          ],
+          ['OS=="win"', {
 diff --git a/cppsrc/main.cpp b/cppsrc/main.cpp
-index 99b55c3..20f0e0a 100755
+index 99b55c3..aad16cc 100644
 --- a/cppsrc/main.cpp
 +++ b/cppsrc/main.cpp
-@@ -4,6 +4,10 @@
+@@ -1,9 +1,13 @@
+ #include <napi.h>
+ 
+-#ifdef __linux__
++#if defined(__linux__) && !defined(OPENHARMONY)
  #include "linux/windowlinux.h"
  #endif
  
@@ -108,7 +117,7 @@ index 0000000..e31de0f
 +  Napi::Object getActiveWindowWrapped(const Napi::CallbackInfo& info);
 +}
 diff --git a/index.js b/index.js
-index 36baf7f..84bc4be 100755
+index 36baf7f..84bc4be 100644
 --- a/index.js
 +++ b/index.js
 @@ -1,4 +1,4 @@
@@ -118,7 +127,7 @@ index 36baf7f..84bc4be 100755
  const exec = require('child_process').exec;
  const fs = require('fs');
 diff --git a/package.json b/package.json
-index b099609..bef5af2 100755
+index b099609..3d361cb 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,11 +1,11 @@
