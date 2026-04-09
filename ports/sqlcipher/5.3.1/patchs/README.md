@@ -18,3 +18,5 @@
 cd node-sqlcipher-5.3.1
 patch -p1 --dry-run < ../patchs/0001-change-prebuild-framework.patch
 ```
+
+若本机 `package.json` 为 CRLF（`git` 的 `autocrlf` 等），请先去掉回车再执行 patch，否则 `package.json` 相关 hunk 会全部失败。`build.sh` 已在打补丁前对 `package.json` 等文件做去 `\r` 处理。

@@ -23,7 +23,7 @@ diff --git a/lib/sqlite3-binding.js b/lib/sqlite3-binding.js
 diff --git a/package.json b/package.json
 --- a/package.json
 +++ b/package.json
-@@ -1,7 +1,7 @@
+@@ -1,22 +1,11 @@
  {
 -  "name": "@journeyapps/sqlcipher",
 +  "name": "@tetcl/sqlcipher",
@@ -33,9 +33,8 @@ diff --git a/package.json b/package.json
    "homepage": "http://github.com/journeyapps/node-sqlcipher",
    "author": {
      "name": "JourneyApps",
-@@ -8,14 +8,3 @@
      "url": "https://journeyapps.com/"
-   },
+-  },
 -  "binary": {
 -    "module_name": "node_sqlite3",
 -    "module_path": "./lib/binding/napi-v{napi_build_version}-{platform}-{arch}",
@@ -46,17 +45,16 @@ diff --git a/package.json b/package.json
 -      3,
 -      6
 -    ]
--  },
+   },
    "contributors": [
-@@ -39,24 +39,35 @@
+     "Konstantin Käfer <mail@kkaefer.com>",
+@@ -38,27 +27,24 @@
+   ],
    "repository": {
      "type": "git",
 -    "url": "git://github.com/journeyapps/node-sqlcipher.git"
 +    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
    },
-+  "bugs": {
-+    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
-+  },
    "dependencies": {
 -    "@mapbox/node-pre-gyp": "^1.0.0",
 -    "node-addon-api": "^3.0.0"
@@ -75,6 +73,31 @@ diff --git a/package.json b/package.json
 -    "node-gyp": "^6.1.0"
 +    "prebuildify": "6.0.1"
    },
+   "scripts": {
+-    "install": "node-pre-gyp install --fallback-to-build",
++    "install": "node-gyp-build",
+     "pretest": "node test/support/createdb.js",
+     "test": "mocha -R spec --timeout 480000",
+-    "pack": "node-pre-gyp package"
++    "prebuild": "prebuildify --napi",
++    "rebuild": "node-gyp rebuild"
+   },
+   "license": "BSD-3-Clause",
+   "keywords": [
+@@ -72,6 +58,23 @@
+   "files": [
+     "lib/**/*.js",
+     "lib/**/*.ts",
+-    "sqlite3.js"
+-  ]
++    "sqlite3.js",
++    "prebuilds/",
++    "deps/",
++    "src/"
++  ],
++  "bugs": {
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
++  },
 +  "peerDependencies": {
 +    "node-gyp": "11.4.2"
 +  },
@@ -85,33 +108,5 @@ diff --git a/package.json b/package.json
 +  },
 +  "optionalDependencies": {
 +    "node-gyp": "11.4.2"
-+  },
-   "scripts": {
--    "install": "node-pre-gyp install --fallback-to-build",
-+    "install": "node-gyp-build",
-     "pretest": "node test/support/createdb.js",
-     "test": "mocha -R spec --timeout 480000",
--    "pack": "node-pre-gyp package"
-+    "prebuild": "prebuildify --napi",
-+    "rebuild": "node-gyp rebuild"
-   },
-@@ -63,15 +63,18 @@
-   "license": "BSD-3-Clause",
-   "keywords": [
-     "sql",
-     "sqlite",
-     "sqlite3",
-     "database"
-   ],
-   "main": "./lib/sqlite3",
-   "types": "./lib/sqlite3.d.ts",
-   "files": [
-     "lib/**/*.js",
-     "lib/**/*.ts",
--    "sqlite3.js"
-+    "sqlite3.js",
-+    "prebuilds/",
-+    "deps/",
-+    "src/"
-   ]
++  }
  }

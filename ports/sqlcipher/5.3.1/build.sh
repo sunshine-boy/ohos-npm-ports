@@ -44,7 +44,8 @@ strip_cr_to_lf() {
     printf '%s\n' "[sqlcipher] ERROR: 无法去除 CRLF（需要 tr、sed 或 awk 之一）" >&2
     return 1
 }
-for f in package.json binding.gyp lib/sqlite3-binding.js; do
+# Windows / git autocrlf 可能把 package.json 变成 CRLF，patch 会整段匹配失败；打补丁前统一去掉 \r
+for f in package.json binding.gyp lib/sqlite3-binding.js lib/sqlite3.js sqlite3.js; do
     strip_cr_to_lf "$f"
 done
 
