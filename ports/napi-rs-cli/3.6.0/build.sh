@@ -5,6 +5,10 @@ set -e
 # 上游为 npm 包 @napi-rs/cli@3.6.0（workspace 根仓库见 https://github.com/napi-rs/napi-rs ）
 # 不 source build-env/setup-env：本 port 仅解压与 patch，无需鸿蒙/LLVM 工具链；便于在 macOS 等环境本地校验。
 
+# 准备编译环境（相对于 ports/<pkg>/<ver>/ 的路径）
+source ../../../build-env.sh
+source ../../../setup-env.sh
+
 PKG_NAME="napi-rs-cli"
 UPSTREAM_VERSION="3.6.0"
 # 与上游 scoped 包名对应的 tgz 文件名：cli-<ver>.tgz
