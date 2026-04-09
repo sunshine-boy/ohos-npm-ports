@@ -8,7 +8,7 @@
 
 至少修改 `package.json`：
 
-- `name` → `@tetclbxm/js-native`
+- `name` → `@tetcl/js-native`
 - `version` → `1.2.4-1`（与发布版本一致）
 - `repository` / `bugs`（建议）→ 维护仓库（本 port 保持现有链接，未随组织名修改）
 
