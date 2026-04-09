@@ -1,0 +1,123 @@
+diff --git a/lib/testbinary.js b/lib/testbinary.js
+index bc4883d..5d77132 100644
+--- a/lib/testbinary.js
++++ b/lib/testbinary.js
+@@ -26,8 +26,9 @@ function testbinary(gyp, argv, callback) {
+   const nw = (opts.runtime && opts.runtime === 'node-webkit');
+   // ensure on windows that / are used for require path
+   const binary_module = opts.module.replace(/\\/g, '/');
+-  if ((process.arch !== opts.target_arch) ||
+-        (process.platform !== opts.target_platform)) {
++  const platformMatches = (process.platform === opts.target_platform) ||
++    (opts.target_platform === 'openharmony' && versioning.host_seems_openharmony());
++  if ((process.arch !== opts.target_arch) || !platformMatches) {
+     let msg = 'skipping validation since host platform/arch (';
+     msg += process.platform + '/' + process.arch + ')';
+     msg += ' does not match target (';
+diff --git a/lib/util/versioning.js b/lib/util/versioning.js
+index b69b367..bec9f47 100644
+--- a/lib/util/versioning.js
++++ b/lib/util/versioning.js
+@@ -271,6 +271,57 @@ function get_process_runtime(versions) {
+ 
+ module.exports.get_process_runtime = get_process_runtime;
+ 
++const fs = require('fs');
++
++function read_os_release_contents() {
++  const paths = ['/etc/os-release', '/usr/etc/os-release'];
++  for (const p of paths) {
++    try {
++      return fs.readFileSync(p, 'utf8');
++    } catch (_) {
++      // continue
++    }
++  }
++  return '';
++}
++
++function host_seems_openharmony() {
++  if (process.platform === 'openharmony') {
++    return true;
++  }
++  if (process.platform !== 'linux') {
++    return false;
++  }
++  const rel = read_os_release_contents().toLowerCase();
++  return /^id=openharmony\b/m.test(rel) || /^id=ohos\b/m.test(rel);
++}
++module.exports.host_seems_openharmony = host_seems_openharmony;
++
++/**
++ * Platform string used in tarball paths ({platform}) and --target_platform.
++ * On OpenHarmony devices Node may still report process.platform === 'linux';
++ * we map that to 'openharmony' when /etc/os-release identifies OH, so install
++ * can fetch e.g. *-openharmony-arm64.tar.gz. Override with --target_platform
++ * or NODE_PRE_GYP_PLATFORM.
++ */
++function resolve_host_platform(options) {
++  if (options.target_platform) {
++    return options.target_platform;
++  }
++  const forced = process.env.NODE_PRE_GYP_PLATFORM;
++  if (forced) {
++    return forced;
++  }
++  if (process.platform === 'openharmony') {
++    return 'openharmony';
++  }
++  if (host_seems_openharmony()) {
++    return 'openharmony';
++  }
++  return process.platform;
++}
++module.exports.resolve_host_platform = resolve_host_platform;
++
+ const default_package_name = '{module_name}-v{version}-{node_abi}-{platform}-{arch}.tar.gz';
+ const default_remote_path = '';
+ 
+@@ -280,6 +331,7 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
+   const v = package_json.version;
+   const module_version = semver.parse(v);
+   const runtime = options.runtime || get_process_runtime(process.versions);
++  const hostPlatform = resolve_host_platform(options);
+   const opts = {
+     name: package_json.name,
+     configuration: options.debug ? 'Debug' : 'Release',
+@@ -298,8 +350,8 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
+     napi_build_version: napi_build_version || '',
+     node_napi_label: napi_build_version ? 'napi-v' + napi_build_version : get_runtime_abi(runtime, options.target),
+     target: options.target || '',
+-    platform: options.target_platform || process.platform,
+-    target_platform: options.target_platform || process.platform,
++    platform: hostPlatform,
++    target_platform: hostPlatform,
+     arch: options.target_arch || process.arch,
+     target_arch: options.target_arch || process.arch,
+     libc: options.target_libc || detect_libc.familySync() || 'unknown',
+diff --git a/package.json b/package.json
+index e1b9e6c..20e6291 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+-  "name": "@mapbox/node-pre-gyp",
++  "name": "@ohos-npm-ports/node-pre-gyp",
+   "description": "Node.js native addon binary install tool",
+-  "version": "2.0.3",
++  "version": "2.0.3-1",
+   "keywords": [
+     "native",
+     "addon",
+@@ -15,7 +15,10 @@
+   "author": "Dane Springmeyer <dane@mapbox.com>",
+   "repository": {
+     "type": "git",
+-    "url": "git://github.com/mapbox/node-pre-gyp.git"
++    "url": "https://github.com/ohos-npm-ports/ohos-npm-ports.git"
++  },
++  "bugs": {
++    "url": "https://github.com/ohos-npm-ports/ohos-npm-ports/issues"
+   },
+   "bin": "./bin/node-pre-gyp",
+   "main": "./lib/node-pre-gyp.js",
