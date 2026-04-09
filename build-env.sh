@@ -8,6 +8,14 @@ ATOMGIT_RELEASE="https://atomgit.com/CodexBai/ohos-temporary-software/releases/d
 INIT_ENV_CFG_NAME="js_pkg_oh_env_arm.cfg"
 INIT_ENV_CFG_DEST_DIR="/system/etc/init"
 
+NODE_ROOT="/opt/node-v24.2.0-openharmony-arm64"
+NODE_TARBALL_URL="https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz"
+OHOS_SDK_LLVM_CLANG="/opt/ohos-sdk/ohos/native/llvm/bin/clang"
+OHOS_SDK_OHOS_DIR="/opt/ohos-sdk/ohos"
+OHOS_SDK_ZIP_NATIVE="native-ohos-x64-6.1.0.27-Canary1.zip"
+OHOS_SDK_ZIP_TC="toolchains-ohos-x64-6.1.0.27-Canary1.zip"
+OHOS_SDK_TAR_URL="https://cidownload.openharmony.cn/version/Master_Version/ohos-sdk-public_ohos/20260108_020526/version-Master_Version-ohos-sdk-public_ohos-20260108_020526-ohos-sdk-public_ohos.tar.gz"
+
 # 将仓库内 init 环境配置拷贝到系统 init 目录（解压制品后由 install_from_atomgit 调用）
 copy_js_pkg_env_cfg_to_system_init() {
     here=$(CDPATH= cd "$(dirname "$0")" && pwd) || exit 1
@@ -188,35 +196,60 @@ install_from_atomgit() {
     copy_js_pkg_env_cfg_to_system_init
 }
 
-# Node.js、/bin 软链、ohos-sdk 与 llvm 封装（与 setup-tools.sh:52-125 一致；下载在 /tmp）
+# Node.js、/bin 软链、ohos-sdk 与 llvm 封装（已存在则跳过下载，仍完成 /bin 与封装配置）
 install_node_ohos_sdk_and_bins() {
-    printf '%s\n' "[build-env] 安装 Node.js、ohos-sdk 及 /bin 工具链封装..."
-    (
-        cd /tmp || exit 1
-        curl -fSLO https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz
-        tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
-        rm -f node-v24.2.0-openharmony-arm64.tar.gz
-    )
+    printf '%s\n' "[build-env] 检查并完成 Node、ohos-sdk 与 /bin 工具链配置..."
 
+    if [ -x "$NODE_ROOT/bin/node" ]; then
+        printf '%s\n' "[build-env] Node 已存在于 $NODE_ROOT，跳过下载"
+    else
+        printf '%s\n' "[build-env] 下载并安装 Node.js..."
+        (
+            cd /tmp || exit 1
+            curl -fSLO "$NODE_TARBALL_URL"
+            tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
+            rm -f node-v24.2.0-openharmony-arm64.tar.gz
+        )
+    fi
+
+    printf '%s\n' "[build-env] 将 /opt 下 *-ohos-arm64/bin 链接到 /bin"
     find /opt -maxdepth 2 -type d | grep "arm64/bin$" | while IFS= read -r dir; do
         cd "$dir"
         ls | /opt/busybox-1.37.0-ohos-arm64/bin/busybox xargs -I {} sh -c "ln -s -f $(realpath {}) /bin/{}"
         cd - >/dev/null
     done
 
-    (
-        cd /tmp || exit 1
-        sdk_download_url="https://cidownload.openharmony.cn/version/Master_Version/ohos-sdk-public_ohos/20260108_020526/version-Master_Version-ohos-sdk-public_ohos-20260108_020526-ohos-sdk-public_ohos.tar.gz"
-        curl -fSL -o ohos-sdk.tar.gz "$sdk_download_url"
-        mkdir -p /opt/ohos-sdk
-        tar -zxf ohos-sdk.tar.gz -C /opt/ohos-sdk
-        rm -f ohos-sdk.tar.gz
-    )
-    cd /opt/ohos-sdk/ohos
-    busybox unzip -q native-ohos-x64-6.1.0.27-Canary1.zip # 这是官方的命名错误，这里写 x64，实际上里面的制品是 arm64
-    busybox unzip -q toolchains-ohos-x64-6.1.0.27-Canary1.zip
-    rm -rf ./*.zip
-    cd - >/dev/null
+    if [ -x "$OHOS_SDK_LLVM_CLANG" ]; then
+        printf '%s\n' "[build-env] ohos-sdk（LLVM）已就绪，跳过 SDK 归档下载与 zip 解压"
+    else
+        if [ -f "$OHOS_SDK_OHOS_DIR/$OHOS_SDK_ZIP_NATIVE" ] || [ -f "$OHOS_SDK_OHOS_DIR/$OHOS_SDK_ZIP_TC" ]; then
+            printf '%s\n' "[build-env] 检测到 SDK zip，仅解压 native/toolchains（不下载归档）"
+            cd "$OHOS_SDK_OHOS_DIR"
+            [ -f "$OHOS_SDK_ZIP_NATIVE" ] && busybox unzip -q "$OHOS_SDK_ZIP_NATIVE" # 官方命名 x64，实为 arm64
+            [ -f "$OHOS_SDK_ZIP_TC" ] && busybox unzip -q "$OHOS_SDK_ZIP_TC"
+            rm -rf ./*.zip
+            cd - >/dev/null
+        else
+            printf '%s\n' "[build-env] 下载并解压 ohos-sdk 归档..."
+            (
+                cd /tmp || exit 1
+                curl -fSL -o ohos-sdk.tar.gz "$OHOS_SDK_TAR_URL"
+                mkdir -p /opt/ohos-sdk
+                tar -zxf ohos-sdk.tar.gz -C /opt/ohos-sdk
+                rm -f ohos-sdk.tar.gz
+            )
+            cd "$OHOS_SDK_OHOS_DIR"
+            [ -f "$OHOS_SDK_ZIP_NATIVE" ] && busybox unzip -q "$OHOS_SDK_ZIP_NATIVE"
+            [ -f "$OHOS_SDK_ZIP_TC" ] && busybox unzip -q "$OHOS_SDK_ZIP_TC"
+            rm -rf ./*.zip
+            cd - >/dev/null
+        fi
+    fi
+
+    if [ ! -x "$OHOS_SDK_LLVM_CLANG" ]; then
+        printf '%s\n' "[build-env] ERROR: ohos-sdk LLVM 仍未就绪: $OHOS_SDK_LLVM_CLANG" >&2
+        exit 1
+    fi
 
     chmod 0755 /opt/ohos-sdk/ohos/native/llvm/bin/*
     chmod 0755 /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool
@@ -244,24 +277,24 @@ EOF
         chmod 0755 "/bin/$executable"
     done
 
-    ln -s /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool /bin/binary-sign-tool
+    ln -sf /opt/ohos-sdk/ohos/toolchains/lib/binary-sign-tool /bin/binary-sign-tool
 
     cd /bin
-    ln -s clang cc
-    ln -s clang gcc
-    ln -s clang++ c++
-    ln -s clang++ g++
-    ln -s ld.lld ld
-    ln -s llvm-addr2line addr2line
-    ln -s llvm-ar ar
-    ln -s llvm-cxxfilt c++filt
-    ln -s llvm-nm nm
-    ln -s llvm-objcopy objcopy
-    ln -s llvm-objdump objdump
-    ln -s llvm-ranlib ranlib
-    ln -s llvm-readelf readelf
-    ln -s llvm-size size
-    ln -s llvm-strip strip
+    ln -sf clang cc
+    ln -sf clang gcc
+    ln -sf clang++ c++
+    ln -sf clang++ g++
+    ln -sf ld.lld ld
+    ln -sf llvm-addr2line addr2line
+    ln -sf llvm-ar ar
+    ln -sf llvm-cxxfilt c++filt
+    ln -sf llvm-nm nm
+    ln -sf llvm-objcopy objcopy
+    ln -sf llvm-objdump objdump
+    ln -sf llvm-ranlib ranlib
+    ln -sf llvm-readelf readelf
+    ln -sf llvm-size size
+    ln -sf llvm-strip strip
     cd - >/dev/null
 }
 
