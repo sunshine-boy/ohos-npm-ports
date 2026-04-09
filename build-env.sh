@@ -1,5 +1,6 @@
 #!/bin/sh
 # 鸿蒙容器内 JS 三方库编译前环境检测与补装（不调用仓库内其他脚本）
+# 可被 `.` / `source` 作为前置脚本引入：成功/失败时用 `return N 2>/dev/null || exit N`，结束本段逻辑而不结束调用方 shell。
 # pkg / ver 与制品包名 $pkg-$ver-ohos-arm64.tar.gz 一致
 
 set -e
@@ -18,11 +19,11 @@ OHOS_SDK_TAR_URL="https://cidownload.openharmony.cn/version/Master_Version/ohos-
 
 # 将仓库内 init 环境配置拷贝到系统 init 目录（解压制品后由 install_from_atomgit 调用）
 copy_js_pkg_env_cfg_to_system_init() {
-    here=$(CDPATH= cd "$(dirname "$0")" && pwd) || exit 1
+    here=$(CDPATH= cd "$(dirname "$0")" && pwd) || return 1
     src="$here/$INIT_ENV_CFG_NAME"
     if [ ! -f "$src" ]; then
         printf '%s\n' "[build-env] ERROR: 未找到配置文件: $src" >&2
-        exit 1
+        return 1
     fi
     mkdir -p "$INIT_ENV_CFG_DEST_DIR"
     cp "$src" "$INIT_ENV_CFG_DEST_DIR/"
@@ -248,7 +249,7 @@ install_node_ohos_sdk_and_bins() {
 
     if [ ! -x "$OHOS_SDK_LLVM_CLANG" ]; then
         printf '%s\n' "[build-env] ERROR: ohos-sdk LLVM 仍未就绪: $OHOS_SDK_LLVM_CLANG" >&2
-        exit 1
+        return 1
     fi
 
     chmod 0755 /opt/ohos-sdk/ohos/native/llvm/bin/*
@@ -307,7 +308,7 @@ collect_missing "$missingf" ""
 if [ ! -s "$missingf" ]; then
     printf '%s\n' "[build-env] 环境检测通过，所需命令均已可用。"
     install_node_ohos_sdk_and_bins
-    exit 0
+    return 0 2>/dev/null || exit 0
 fi
 
 cut -f1 "$missingf" > "$neededf"
@@ -327,7 +328,7 @@ else
     printf '%s\n' "[build-env] 未检测到 brew，改为从 atomgit 拉取制品包。"
     if ! command -v curl >/dev/null 2>&1; then
         printf '%s\n' "[build-env] ERROR: 需要 curl 以下载制品，且当前无 brew。" >&2
-        exit 1
+        return 1 2>/dev/null || exit 1
     fi
     install_from_atomgit "$missingf"
 fi
@@ -337,9 +338,9 @@ collect_missing "$missingf" "$neededf"
 if [ -s "$missingf" ]; then
     printf '%s\n' "[build-env] 自动安装后仍缺失:" >&2
     cut -f1 "$missingf" >&2
-    exit 1
+    return 1 2>/dev/null || exit 1
 fi
 
 printf '%s\n' "[build-env] 补装后复检通过，所需命令均已可用。"
 install_node_ohos_sdk_and_bins
-exit 0
+return 0 2>/dev/null || exit 0
