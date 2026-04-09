@@ -1,0 +1,117 @@
+diff --git a/binding.gyp b/binding.gyp
+--- a/binding.gyp
++++ b/binding.gyp
+@@ -56,7 +56,7 @@
+         "src/node_sqlite3.cc",
+         "src/statement.cc"
+       ],
+-      "defines": [ "NAPI_VERSION=<(napi_build_version)", "NAPI_DISABLE_CPP_EXCEPTIONS=1" ]
++      "defines": [ "NAPI_VERSION=6", "NAPI_DISABLE_CPP_EXCEPTIONS=1" ]
+     },
+     {
+       "target_name": "action_after_build",
+diff --git a/lib/sqlite3-binding.js b/lib/sqlite3-binding.js
+--- a/lib/sqlite3-binding.js
++++ b/lib/sqlite3-binding.js
+@@ -1,5 +1 @@
+-var binary = require('@mapbox/node-pre-gyp');
+-var path = require('path');
+-var binding_path = binary.find(path.resolve(path.join(__dirname,'../package.json')));
+-var binding = require(binding_path);
+-module.exports = exports = binding;
++module.exports = require('node-gyp-build')(__dirname + "/../")
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+-  "name": "@journeyapps/sqlcipher",
++  "name": "@tetcl/sqlcipher",
+   "description": "Asynchronous, non-blocking SQLCipher bindings",
+-  "version": "5.3.1",
++  "version": "5.3.1-1",
+   "homepage": "http://github.com/journeyapps/node-sqlcipher",
+   "author": {
+     "name": "JourneyApps",
+@@ -8,14 +8,3 @@
+     "url": "https://journeyapps.com/"
+   },
+-  "binary": {
+-    "module_name": "node_sqlite3",
+-    "module_path": "./lib/binding/napi-v{napi_build_version}-{platform}-{arch}",
+-    "host": "https://journeyapps-node-binary.s3.amazonaws.com",
+-    "remote_path": "./{name}/v{version}/{toolset}/",
+-    "package_name": "napi-v{napi_build_version}-{platform}-{arch}.tar.gz",
+-    "napi_versions": [
+-      3,
+-      6
+-    ]
+-  },
+   "contributors": [
+@@ -39,24 +39,35 @@
+   "repository": {
+     "type": "git",
+-    "url": "git://github.com/journeyapps/node-sqlcipher.git"
++    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
+   },
++  "bugs": {
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
++  },
+   "dependencies": {
+-    "@mapbox/node-pre-gyp": "^1.0.0",
+-    "node-addon-api": "^3.0.0"
++    "node-addon-api": "^7.0.0",
++    "node-gyp-build": "^4.8.4",
++    "tar": "^6.1.11"
+   },
+   "devDependencies": {
+-    "aws-sdk": "^2.641.0",
+-    "electron": "^11.2.3",
+-    "electron-mocha": "^10.0.0",
+-    "electron-rebuild": "^1.11.0",
+     "eslint": "3.5.0",
+     "mocha": "^5.2.0",
+-    "node-abi": "^2.19.3",
+-    "node-gyp": "^6.1.0"
++    "prebuildify": "6.0.1"
+   },
++  "peerDependencies": {
++    "node-gyp": "11.4.2"
++  },
++  "peerDependenciesMeta": {
++    "node-gyp": {
++      "optional": true
++    }
++  },
++  "optionalDependencies": {
++    "node-gyp": "11.4.2"
++  },
+   "scripts": {
+-    "install": "node-pre-gyp install --fallback-to-build",
++    "install": "node-gyp-build",
+     "pretest": "node test/support/createdb.js",
+     "test": "mocha -R spec --timeout 480000",
+-    "pack": "node-pre-gyp package"
++    "prebuild": "prebuildify --napi",
++    "rebuild": "node-gyp rebuild"
+   },
+@@ -63,15 +63,18 @@
+   "license": "BSD-3-Clause",
+   "keywords": [
+     "sql",
+     "sqlite",
+     "sqlite3",
+     "database"
+   ],
+   "main": "./lib/sqlite3",
+   "types": "./lib/sqlite3.d.ts",
+   "files": [
+     "lib/**/*.js",
+     "lib/**/*.ts",
+-    "sqlite3.js"
++    "sqlite3.js",
++    "prebuilds/",
++    "deps/",
++    "src/"
+   ]
+ }
