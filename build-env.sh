@@ -18,11 +18,22 @@ OHOS_SDK_ZIP_TC="toolchains-ohos-x64-6.1.0.27-Canary1.zip"
 OHOS_SDK_TAR_URL="https://cidownload.openharmony.cn/version/Master_Version/ohos-sdk-public_ohos/20260108_020526/version-Master_Version-ohos-sdk-public_ohos-20260108_020526-ohos-sdk-public_ohos.tar.gz"
 
 # 将仓库内 init 环境配置拷贝到系统 init 目录（解压制品后由 install_from_atomgit 调用）
+# 注意：被 source 时 $0 是调用方（如 ports/.../build.sh），不能仅用 dirname "$0"；需向上找到含 cfg 的仓库根
 copy_js_pkg_env_cfg_to_system_init() {
-    here=$(CDPATH= cd "$(dirname "$0")" && pwd) || return 1
-    src="$here/$INIT_ENV_CFG_NAME"
-    if [ ! -f "$src" ]; then
-        printf '%s\n' "[build-env] ERROR: 未找到配置文件: $src" >&2
+    start=$(CDPATH= cd "$(dirname "$0")" && pwd) || return 1
+    here=$start
+    src=""
+    while [ -n "$here" ]; do
+        if [ -f "$here/$INIT_ENV_CFG_NAME" ]; then
+            src="$here/$INIT_ENV_CFG_NAME"
+            break
+        fi
+        parent=$(dirname "$here")
+        [ "$parent" = "$here" ] && break
+        here=$parent
+    done
+    if [ -z "$src" ] || [ ! -f "$src" ]; then
+        printf '%s\n' "[build-env] ERROR: 未找到 $INIT_ENV_CFG_NAME（已从 $start 向父目录向上查找）" >&2
         return 1
     fi
     mkdir -p "$INIT_ENV_CFG_DEST_DIR"
