@@ -102,7 +102,7 @@ index e1b9e6c..20e6291 100644
 @@ -1,7 +1,7 @@
  {
 -  "name": "@mapbox/node-pre-gyp",
-+  "name": "@ohos-npm-ports/node-pre-gyp",
++  "name": "@tetcl/node-pre-gyp",
    "description": "Node.js native addon binary install tool",
 -  "version": "2.0.3",
 +  "version": "2.0.3-1",
@@ -114,10 +114,10 @@ index e1b9e6c..20e6291 100644
    "repository": {
      "type": "git",
 -    "url": "git://github.com/mapbox/node-pre-gyp.git"
-+    "url": "https://github.com/ohos-npm-ports/ohos-npm-ports.git"
++    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
 +  },
 +  "bugs": {
-+    "url": "https://github.com/ohos-npm-ports/ohos-npm-ports/issues"
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
    },
    "bin": "./bin/node-pre-gyp",
    "main": "./lib/node-pre-gyp.js",
