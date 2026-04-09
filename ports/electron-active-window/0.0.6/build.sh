@@ -49,6 +49,9 @@ done
 
 patch -p1 < ../patchs/0001-change-prebuild-framework.patch
 
+# 流水线多为 Linux 内核 + OpenHarmony Node：gyp 仍视为 OS=linux，会编 X11；强制走 OpenHarmony 存根（无 X11 头文件）
+export ELECTRON_ACTIVE_WINDOW_OH_PORT=1
+
 npm install
 npm run prebuild
 

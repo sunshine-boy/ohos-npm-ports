@@ -28,7 +28,7 @@ git diff > ../patchs/0001-update-package-json.patch
 
 - 加载：`index.js` → `node-gyp-build`
 - 脚本：`prebuild` → `prebuildify --napi`，`install` → `node-gyp-build`
-- `binding.gyp`：`OS=="openharmony"` 与 OpenHarmony 存根实现；`NODE_API_MODULE(wm, …)`（故 `build.sh` 将 `wm.node` 重命名为 `@tetcl+electron-active-window.node`）
+- `binding.gyp`：`eaw_oh_port`（环境变量 `ELECTRON_ACTIVE_WINDOW_OH_PORT=1`）与 `OS=="openharmony"` 走存根；`OS=="linux"` 且未设置该变量时仍编 X11 路径。CI/Linux 上由 `build.sh` 导出 `ELECTRON_ACTIVE_WINDOW_OH_PORT=1`。`NODE_API_MODULE(wm, …)`（故 `build.sh` 将 `wm.node` 重命名为 `@tetcl+electron-active-window.node`）
 - `files`：包含 `prebuilds/`
 
 ## 校验

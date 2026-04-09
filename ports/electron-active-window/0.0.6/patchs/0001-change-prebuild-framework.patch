@@ -2,18 +2,35 @@ diff --git a/binding.gyp b/binding.gyp
 index 574511f..0ac87af 100755
 --- a/binding.gyp
 +++ b/binding.gyp
-@@ -17,6 +17,11 @@
-              'cflags_cc': ["-fexceptions -lX11 -lXext -lXss"],
-            }
-          ],
+@@ -1,16 +1,27 @@
+ {
+   "targets": [
+     {
+       "target_name": "wm",
++      "variables": {
++        "eaw_oh_port%": "<!(node -p \"process.env.ELECTRON_ACTIVE_WINDOW_OH_PORT==='1'?'1':'0'\")"
++      },
+       "sources": [ "cppsrc/main.cpp"],
+       "cflags": ["-fexceptions -std=c++11"],
+       "cflags_cc": ["-fexceptions"],
+       'conditions': [
+-         ['OS=="linux"', {
++         ['eaw_oh_port=="1"', {
++           'defines': [ 'OPENHARMONY=1' ],
++           'sources': ["cppsrc/main.cpp", "cppsrc/openharmony/windowopenharmony.cpp"]
++         }],
 +         ['OS=="openharmony"', {
 +           'defines': [ 'OPENHARMONY=1' ],
 +           'sources': ["cppsrc/main.cpp", "cppsrc/openharmony/windowopenharmony.cpp"]
-+          }
-+         ],
-          ['OS=="win"', {
-            'sources': ["cppsrc/main.cpp", "cppsrc/windows/windowwindows.cpp"]
-             }
++         }],
++         ['OS=="linux" and eaw_oh_port!="1"', {
+            'sources': ["cppsrc/main.cpp", "cppsrc/linux/windowlinux.cpp"],
+            'libraries': [
+                "-lX11",
+                "-lXss",
+                "-lxcb"
+              ],
+              'cflags': ["-fexceptions -std=c++11 -lX11 -lXext -lXss"],
 diff --git a/cppsrc/main.cpp b/cppsrc/main.cpp
 index 99b55c3..20f0e0a 100755
 --- a/cppsrc/main.cpp
