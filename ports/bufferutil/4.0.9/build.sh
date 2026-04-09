@@ -15,6 +15,11 @@ patch -p1 < ../patchs/0001-update-package-json.patch
 npm install
 npm run prebuild
 
+# 规范产物命名（prebuildify 默认可能产出 prebuilds/<platform>/wm.node）
+if [ -f "./prebuilds/openharmony-arm64/wm.node" ] && [ ! -f "./prebuilds/openharmony-arm64/@ohos-npm-ports+${PKG}.node" ]; then
+  mv "./prebuilds/openharmony-arm64/wm.node" "./prebuilds/openharmony-arm64/@ohos-npm-ports+${PKG}.node"
+fi
+
 # 代码签名
 binary-sign-tool sign -inFile prebuilds/openharmony-arm64/@ohos-npm-ports+bufferutil.node -outFile prebuilds/openharmony-arm64/@ohos-npm-ports+bufferutil.node -selfSign 1
 
