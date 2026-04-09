@@ -23,11 +23,25 @@ curl -fsSL "${UPSTREAM_TARBALL_URL}" -o "${TARBALL}"
 tar -zxf "${TARBALL}"
 cd "${SRC_DIR}"
 
-# 上游 npm 包多为 CRLF；Harmony/精简镜像里常无 perl，perl 失败时 patch 会整段不匹配
+# 上游 npm 包多为 CRLF；精简镜像可能无 perl/tr，依次尝试 tr / sed / awk
 strip_cr_to_lf() {
     f=$1
     [ -f "$f" ] || return 0
-    tr -d '\r' <"$f" >"$f.be-lf.tmp" && mv "$f.be-lf.tmp" "$f"
+    if command -v tr >/dev/null 2>&1; then
+        tr -d '\r' <"$f" >"$f.be-lf.tmp" && mv "$f.be-lf.tmp" "$f"
+        return 0
+    fi
+    CR=$(printf '\r')
+    if command -v sed >/dev/null 2>&1; then
+        sed "s/${CR}\$//" <"$f" >"$f.be-lf.tmp" && mv "$f.be-lf.tmp" "$f"
+        return 0
+    fi
+    if command -v awk >/dev/null 2>&1; then
+        awk '{ sub(/\r$/,""); print }' <"$f" >"$f.be-lf.tmp" && mv "$f.be-lf.tmp" "$f"
+        return 0
+    fi
+    printf '%s\n' "[electron-active-window] ERROR: 无法去除 CRLF（需要 tr、sed 或 awk 之一）" >&2
+    return 1
 }
 for f in package.json index.js binding.gyp cppsrc/main.cpp setup.js; do
     strip_cr_to_lf "$f"
