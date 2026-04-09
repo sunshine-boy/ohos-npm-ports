@@ -4,8 +4,41 @@
 
 set -e
 
+# 尽力读取单行版本信息（--version / -version / -V，合并 stderr）
+get_ver_line() {
+    cmd=$1
+    line=""
+    line=$("$cmd" --version 2>&1 | head -n 1) || :
+    if [ -z "$line" ]; then
+        line=$("$cmd" -version 2>&1 | head -n 1) || :
+    fi
+    if [ -z "$line" ]; then
+        line=$("$cmd" -V 2>&1 | head -n 1) || :
+    fi
+    printf '%s' "$line"
+}
+
 log_ok() {
-    printf '%s\n' "[build-env] OK: $1 -> $(command -v "$1")"
+    cmd=$1
+    path=$(command -v "$cmd")
+    ver=$(get_ver_line "$cmd")
+    if [ -n "$ver" ]; then
+        printf '%s\n' "[build-env] OK: $cmd -> $path 版本: $ver"
+    else
+        printf '%s\n' "[build-env] OK: $cmd -> $path（未能解析版本号）"
+    fi
+}
+
+log_ok_as() {
+    logical=$1
+    real=$2
+    path=$(command -v "$real")
+    ver=$(get_ver_line "$real")
+    if [ -n "$ver" ]; then
+        printf '%s\n' "[build-env] OK: $logical（$real） -> $path 版本: $ver"
+    else
+        printf '%s\n' "[build-env] OK: $logical（$real） -> $path（未能解析版本号）"
+    fi
 }
 
 log_miss() {
@@ -34,13 +67,13 @@ while IFS="$(printf '\t')" read -r cmd pkg ver; do
         case $cmd in
             vim)
                 if command -v nvim >/dev/null 2>&1; then
-                    printf '%s\n' "[build-env] OK: vim（实际为 nvim） -> $(command -v nvim)"
+                    log_ok_as vim nvim
                     continue
                 fi
                 ;;
             python)
                 if command -v python3 >/dev/null 2>&1; then
-                    printf '%s\n' "[build-env] OK: python（实际为 python3） -> $(command -v python3)"
+                    log_ok_as python python3
                     continue
                 fi
                 ;;
