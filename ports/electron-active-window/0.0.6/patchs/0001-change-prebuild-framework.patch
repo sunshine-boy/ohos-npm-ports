@@ -1,0 +1,162 @@
+diff --git a/binding.gyp b/binding.gyp
+index 574511f..0ac87af 100755
+--- a/binding.gyp
++++ b/binding.gyp
+@@ -17,6 +17,11 @@
+              'cflags_cc': ["-fexceptions -lX11 -lXext -lXss"],
+            }
+          ],
++         ['OS=="openharmony"', {
++           'defines': [ 'OPENHARMONY=1' ],
++           'sources': ["cppsrc/main.cpp", "cppsrc/openharmony/windowopenharmony.cpp"]
++          }
++         ],
+          ['OS=="win"', {
+            'sources': ["cppsrc/main.cpp", "cppsrc/windows/windowwindows.cpp"]
+             }
+diff --git a/cppsrc/main.cpp b/cppsrc/main.cpp
+index 99b55c3..20f0e0a 100755
+--- a/cppsrc/main.cpp
++++ b/cppsrc/main.cpp
+@@ -4,6 +4,10 @@
+ #include "linux/windowlinux.h"
+ #endif
+ 
++#ifdef OPENHARMONY
++#include "openharmony/windowopenharmony.h"
++#endif
++
+ #ifdef _WIN32
+ #include "windows/windowwindows.h"
+ #endif
+@@ -16,6 +20,8 @@
+ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
+ 	#ifdef _WIN32
+ 		return windowwindows::Init(env, exports);
++	#elif OPENHARMONY
++		return windowopenharmony::Init(env, exports);
+ 	#elif __linux
+ 		return windowlinux::Init(env, exports);
+ 	#elif __APPLE__
+@@ -23,4 +29,4 @@ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
+ 	#endif
+ }
+ 
+-NODE_API_MODULE(testaddon, InitAll)
++NODE_API_MODULE(wm, InitAll)
+diff --git a/cppsrc/openharmony/windowopenharmony.cpp b/cppsrc/openharmony/windowopenharmony.cpp
+new file mode 100644
+index 0000000..94053b9
+--- /dev/null
++++ b/cppsrc/openharmony/windowopenharmony.cpp
+@@ -0,0 +1,26 @@
++#include "windowopenharmony.h"
++
++Napi::Object windowopenharmony::getActiveWindowWrapped(const Napi::CallbackInfo& info) {
++  Napi::Env env = info.Env();
++  Napi::Object obj = Napi::Object::New(env);
++
++  obj.Set("os", "openharmony");
++  obj.Set("windowClass", "");
++  obj.Set("windowName", "");
++  obj.Set("windowDesktop", "0");
++  obj.Set("windowType", "0");
++  obj.Set("windowPid", "0");
++  obj.Set("idleTime", "0");
++  obj.Set("error", "1");
++  obj.Set("errorMessage", "electron-active-window: OpenHarmony is not supported yet");
++
++  return obj;
++}
++
++Napi::Object windowopenharmony::Init(Napi::Env env, Napi::Object exports) {
++  exports.Set(
++    "getActiveWindow",
++    Napi::Function::New(env, windowopenharmony::getActiveWindowWrapped)
++  );
++  return exports;
++}
+diff --git a/cppsrc/openharmony/windowopenharmony.h b/cppsrc/openharmony/windowopenharmony.h
+new file mode 100644
+index 0000000..e31de0f
+--- /dev/null
++++ b/cppsrc/openharmony/windowopenharmony.h
+@@ -0,0 +1,8 @@
++#pragma once
++
++#include <napi.h>
++
++namespace windowopenharmony {
++  Napi::Object Init(Napi::Env env, Napi::Object exports);
++  Napi::Object getActiveWindowWrapped(const Napi::CallbackInfo& info);
++}
+diff --git a/index.js b/index.js
+index 36baf7f..84bc4be 100755
+--- a/index.js
++++ b/index.js
+@@ -1,4 +1,4 @@
+-const activeWindows = require('./build/Release/wm');
++const activeWindows = require('node-gyp-build')(__dirname);
+ const os = require('os');
+ const exec = require('child_process').exec;
+ const fs = require('fs');
+diff --git a/package.json b/package.json
+index b099609..bef5af2 100755
+--- a/package.json
++++ b/package.json
+@@ -1,11 +1,11 @@
+ {
+-  "name": "electron-active-window",
+-  "version": "0.0.6",
++  "name": "@tetcl/electron-active-window",
++  "version": "0.0.6-2",
+   "author": "Yves Hoppe <contact@bytee.net> (https://bytee.net), nullx <mail@nullx.me> (nullx.me)",
+   "homepage": "https://bytee.net, https://nullx.me",
+   "repository": {
+     "type": "git",
+-    "url": "https://github.com/nullxx/active-windows"
++    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
+   },
+   "keywords": [
+     "current-window",
+@@ -19,18 +19,36 @@
+   "gypfile": true,
+   "scripts": {
+     "preinstall": "node setup.js",
+-    "install": "prebuild-install || node-gyp rebuild",
++    "install": "node-gyp-build",
+     "build": "node-gyp rebuild",
+-    "clean": "node-gyp clean"
++    "clean": "node-gyp clean",
++    "prebuild": "prebuildify --napi"
+   },
+   "license": "MIT",
+   "dependencies": {
+     "fs": "^0.0.1-security",
+-    "node-addon-api": "^1.7.1"
++    "node-addon-api": "^1.7.1",
++    "node-gyp-build": "^4.8.4"
+   },
+   "binary": {
+     "napi_versions": [
+       3
+     ]
+-  }
++  },
++  "bugs": {
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
++  },
++  "devDependencies": {
++    "prebuildify": "6.0.1"
++  },
++  "files": [
++    "index.js",
++    "binding.gyp",
++    "cppsrc/",
++    "mac/",
++    "prebuilds/",
++    "setup.js",
++    "README.md",
++    "sample.js"
++  ]
+ }
