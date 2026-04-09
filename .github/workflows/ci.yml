@@ -67,11 +67,11 @@ jobs:
           ./build.sh
 
       # 只有直接 push 或 PR 被合入时才会进行发布
-      # - name: Publish
-      #  if: github.event_name == 'push'
-      #  env:
-      #    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      #  run: |
-      #    echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
-      #    cd "${{ matrix.dir }}"
-      #    ./publish.sh
+      - name: Publish
+        if: github.event_name == 'push'
+         env:
+           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+         run: |
+           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+           cd "${{ matrix.dir }}"
+           ./publish.sh
