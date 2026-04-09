@@ -6,7 +6,7 @@
 
 将上游 [@journeyapps/sqlcipher](https://www.npmjs.com/package/@journeyapps/sqlcipher) 使用的 `@mapbox/node-pre-gyp` 安装流改为与本仓库其他原生包一致的 **node-gyp-build + prebuildify**（参见 `ports/sqlite3`）：
 
-- `binding.gyp`：固定 `NAPI_VERSION=6`，与上游提供的 napi-v6 预编译一致。
+- `binding.gyp`：在 `variables` 中补充 `module_name`（原为 `node-pre-gyp` 从 `package.json` 的 `binary` 注入）；固定 `NAPI_VERSION=6`；去掉依赖未定义的 `module_path` 的 `action_after_build` 拷贝目标（产物留在 `build/Release/`，由 `node-gyp-build` / `prebuildify` 消费）。
 - `lib/sqlite3-binding.js`：改为 `require('node-gyp-build')`。
 - `package.json`：发布名为 `@tetcl/sqlcipher`，版本 `5.3.1-1`；`repository` / `bugs` 指向本 ports 仓库；`files` 包含 `prebuilds/`、`deps/`、`src/`。
 
