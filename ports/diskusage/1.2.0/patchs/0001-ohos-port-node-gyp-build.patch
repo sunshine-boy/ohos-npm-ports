@@ -1,0 +1,78 @@
+diff --git a/binding.gyp b/binding.gyp
+index 9cd596d..eeae4c6 100644
+--- a/binding.gyp
++++ b/binding.gyp
+@@ -8,8 +8,7 @@
+         'src/diskusage.h',
+       ],
+       'cflags' : [
+-        '-std=c++11',
+-        '-D_GLIBCXX_USE_CXX11_ABI=0'
++        '-std=c++11'
+       ],
+       'conditions': [
+         ['OS=="win"', {
+diff --git a/fallback.js b/fallback.js
+index a0eb17e..f79d608 100644
+--- a/fallback.js
++++ b/fallback.js
+@@ -1,4 +1,4 @@
+-var native = require("./build/Release/diskusage.node");
++var native = require("node-gyp-build")(__dirname);
+ var promise = typeof Promise !== "undefined" ? Promise : require("es6-promise").Promise;
+ 
+ exports.check = function(path, callback) {
+diff --git a/package.json b/package.json
+index c671a88..95a9ecd 100644
+--- a/package.json
++++ b/package.json
+@@ -1,20 +1,35 @@
+ {
+-  "name": "diskusage",
+-  "version": "1.2.0",
++  "name": "@tetcl/diskusage",
++  "version": "1.2.0-1",
+   "description": "Get total diskspace and free diskspace using bindings around platform specific calls.",
+   "main": "index.js",
+   "typings": "index.d.ts",
+   "gypfile": true,
++  "scripts": {
++    "install": "node-gyp-build",
++    "prebuild": "prebuildify --strip --target=24.2.0"
++  },
+   "dependencies": {
+     "es6-promise": "^4.2.8",
+-    "nan": "^2.18.0"
++    "nan": "^2.18.0",
++    "node-gyp-build": "^4.8.4"
+   },
+   "devDependencies": {
+-    "eslint": "^8.49.0"
++    "eslint": "^8.49.0",
++    "node-gyp": "^11.0.0",
++    "prebuildify": "^6.0.0"
+   },
++  "files": [
++    "index.js",
++    "index.d.ts",
++    "fallback.js",
++    "binding.gyp",
++    "src",
++    "prebuilds"
++  ],
+   "repository": {
+     "type": "git",
+-    "url": "https://github.com/jduncanator/node-diskusage.git"
++    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
+   },
+   "keywords": [
+     "disk",
+@@ -30,7 +45,7 @@
+   "author": "jduncanator",
+   "license": "MIT",
+   "bugs": {
+-    "url": "https://github.com/jduncanator/node-diskusage/issues"
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
+   },
+   "homepage": "https://github.com/jduncanator/node-diskusage"
+ }
