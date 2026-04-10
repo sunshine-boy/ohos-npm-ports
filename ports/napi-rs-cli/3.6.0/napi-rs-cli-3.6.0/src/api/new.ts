@@ -33,25 +33,76 @@ const TEMPLATE_REPOS = {
   pnpm: 'https://github.com/napi-rs/package-template-pnpm',
 } as const
 
+/** GitHub tarball when `git clone` / `git fetch` fails (e.g. OpenHarmony SSL or network). */
+const TEMPLATE_ARCHIVE_URLS: Record<SupportedPackageManager, string> = {
+  yarn: 'https://github.com/napi-rs/package-template/archive/refs/heads/main.tar.gz',
+  pnpm:
+    'https://github.com/napi-rs/package-template-pnpm/archive/refs/heads/main.tar.gz',
+}
+
+function getTemplateArchiveUrl(
+  packageManager: SupportedPackageManager,
+): string {
+  if (
+    packageManager === 'yarn' &&
+    process.env.NAPI_RS_PACKAGE_TEMPLATE_ARCHIVE_URL
+  ) {
+    return process.env.NAPI_RS_PACKAGE_TEMPLATE_ARCHIVE_URL
+  }
+  if (
+    packageManager === 'pnpm' &&
+    process.env.NAPI_RS_PACKAGE_TEMPLATE_PNPM_ARCHIVE_URL
+  ) {
+    return process.env.NAPI_RS_PACKAGE_TEMPLATE_PNPM_ARCHIVE_URL
+  }
+  return TEMPLATE_ARCHIVE_URLS[packageManager]
+}
+
 async function checkGitCommand(): Promise<boolean> {
   try {
-    await new Promise((resolve) => {
+    return await new Promise<boolean>((resolve) => {
       const cp = exec('git --version')
       cp.on('error', () => {
         resolve(false)
       })
       cp.on('exit', (code) => {
-        if (code === 0) {
-          resolve(true)
-        } else {
-          resolve(false)
-        }
+        resolve(code === 0)
       })
     })
-    return true
   } catch {
     return false
   }
+}
+
+/**
+ * Download template without git (uses global fetch + system `tar`).
+ * Set NAPI_RS_TEMPLATE_USE_ARCHIVE=1 to skip git entirely on constrained devices.
+ */
+async function downloadTemplateArchive(
+  packageManager: SupportedPackageManager,
+  cacheDir: string,
+): Promise<void> {
+  const url = getTemplateArchiveUrl(packageManager)
+  const templatePath = path.join(cacheDir, 'repo')
+  const tgz = path.join(cacheDir, 'napi-rs-template.tgz')
+  await fs.rm(templatePath, { recursive: true, force: true }).catch(() => {})
+  await mkdirAsync(templatePath, { recursive: true })
+  const res = await fetch(url, { redirect: 'follow' })
+  if (!res.ok) {
+    throw new Error(
+      `Failed to download template archive (${res.status} ${res.statusText}): ${url}`,
+    )
+  }
+  const buf = Buffer.from(await res.arrayBuffer())
+  await fs.writeFile(tgz, buf)
+  try {
+    execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, {
+      stdio: 'inherit',
+    })
+  } finally {
+    await fs.unlink(tgz).catch(() => {})
+  }
+  debug(`Template installed from archive: ${url}`)
 }
 
 async function ensureCacheDir(
@@ -62,7 +113,7 @@ async function ensureCacheDir(
   return cacheDir
 }
 
-async function downloadTemplate(
+async function downloadTemplateWithGit(
   packageManager: SupportedPackageManager,
   cacheDir: string,
 ): Promise<void> {
@@ -71,39 +122,57 @@ async function downloadTemplate(
 
   if (existsSync(templatePath)) {
     debug(`Template cache found at ${templatePath}, updating...`)
-    try {
-      // Fetch latest changes and reset to remote
-      await new Promise<void>((resolve, reject) => {
-        const cp = exec('git fetch origin', { cwd: templatePath })
-        cp.on('error', reject)
-        cp.on('exit', (code) => {
-          if (code === 0) {
-            resolve()
-          } else {
-            reject(
-              new Error(
-                `Failed to fetch latest changes, git process exited with code ${code}`,
-              ),
-            )
-          }
-        })
+    await new Promise<void>((resolve, reject) => {
+      const cp = exec('git fetch origin', { cwd: templatePath })
+      cp.on('error', reject)
+      cp.on('exit', (code) => {
+        if (code === 0) {
+          resolve()
+        } else {
+          reject(
+            new Error(
+              `Failed to fetch latest changes, git process exited with code ${code}`,
+            ),
+          )
+        }
       })
-      execSync('git reset --hard origin/main', {
-        cwd: templatePath,
-        stdio: 'ignore',
-      })
-      debug('Template updated successfully')
-    } catch (error) {
-      debug(`Failed to update template: ${error}`)
-      throw new Error(`Failed to update template from ${repoUrl}: ${error}`)
-    }
+    })
+    execSync('git reset --hard origin/main', {
+      cwd: templatePath,
+      stdio: 'ignore',
+    })
+    debug('Template updated successfully')
   } else {
     debug(`Cloning template from ${repoUrl}...`)
+    execSync(`git clone ${repoUrl} repo`, { cwd: cacheDir, stdio: 'inherit' })
+    debug('Template cloned successfully')
+  }
+}
+
+async function downloadTemplate(
+  packageManager: SupportedPackageManager,
+  cacheDir: string,
+): Promise<void> {
+  const repoUrl = TEMPLATE_REPOS[packageManager]
+
+  if (process.env.NAPI_RS_TEMPLATE_USE_ARCHIVE === '1') {
+    debug('NAPI_RS_TEMPLATE_USE_ARCHIVE=1, using HTTP archive only')
+    await downloadTemplateArchive(packageManager, cacheDir)
+    return
+  }
+
+  try {
+    await downloadTemplateWithGit(packageManager, cacheDir)
+  } catch (error) {
+    debug(`Git template failed (${error}), falling back to HTTP archive...`)
     try {
-      execSync(`git clone ${repoUrl} repo`, { cwd: cacheDir, stdio: 'inherit' })
-      debug('Template cloned successfully')
-    } catch (error) {
-      throw new Error(`Failed to clone template from ${repoUrl}: ${error}`)
+      const templatePath = path.join(cacheDir, 'repo')
+      await fs.rm(templatePath, { recursive: true, force: true }).catch(() => {})
+      await downloadTemplateArchive(packageManager, cacheDir)
+    } catch (e2) {
+      throw new Error(
+        `Failed to get template from ${repoUrl} (git and archive both failed): ${error}; archive: ${e2}`,
+      )
     }
   }
 }
@@ -343,10 +412,10 @@ export async function newProject(userOptions: RawNewOptions) {
   debug('Targets to be enabled:')
   debug(options.targets)
 
-  // Check if git is available
-  if (!(await checkGitCommand())) {
+  const useArchiveOnly = process.env.NAPI_RS_TEMPLATE_USE_ARCHIVE === '1'
+  if (!useArchiveOnly && !(await checkGitCommand())) {
     throw new Error(
-      'Git is not installed or not available in PATH. Please install Git to continue.',
+      'Git is not installed or not available in PATH. Please install Git to continue, or set NAPI_RS_TEMPLATE_USE_ARCHIVE=1 to download the template via HTTPS+tar.',
     )
   }
 

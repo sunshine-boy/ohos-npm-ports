@@ -1,11 +1,10 @@
 #!/bin/sh
 set -e
 
-# 纯 JS/TS 产物（@napi-rs/cli）：npm tgz 已含 dist/，打 patch 后即可发布；无 prebuild / 签名。
+# 纯 JS/TS 产物（@napi-rs/cli）：npm tgz 已含 dist/，打 patch 后即可发布；无 addon 构建 / prebuild / 签名。
 # 上游为 npm 包 @napi-rs/cli@3.6.0（workspace 根仓库见 https://github.com/napi-rs/napi-rs ）
-# 不 source build-env/setup-env：本 port 仅解压与 patch，无需鸿蒙/LLVM 工具链；便于在 macOS 等环境本地校验。
 
-# 准备编译环境（相对于 ports/<pkg>/<ver>/ 的路径）
+# 准备编译环境（与其他 port 对齐；本包实际仅需解压与 patch，工具链检查在部分桌面环境可能较吵）
 source ../../../build-env.sh
 source ../../../setup-env.sh
 
@@ -45,4 +44,5 @@ rm -f "${NPM_TARBALL}"
 cd "${WORKDIR}"
 strip_cr_to_lf package.json
 patch -p1 < ../patchs/0001-update-package-json.patch
+patch -p1 < ../patchs/0002-template-archive-fallback.patch
 cd ..

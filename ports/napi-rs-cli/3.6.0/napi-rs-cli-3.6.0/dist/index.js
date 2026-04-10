@@ -2937,19 +2937,26 @@ const TEMPLATE_REPOS = {
 	yarn: "https://github.com/napi-rs/package-template",
 	pnpm: "https://github.com/napi-rs/package-template-pnpm"
 };
+const TEMPLATE_ARCHIVE_URLS = {
+	yarn: "https://github.com/napi-rs/package-template/archive/refs/heads/main.tar.gz",
+	pnpm: "https://github.com/napi-rs/package-template-pnpm/archive/refs/heads/main.tar.gz"
+};
+function getTemplateArchiveUrl(packageManager) {
+	if (packageManager === "yarn" && process.env.NAPI_RS_PACKAGE_TEMPLATE_ARCHIVE_URL) return process.env.NAPI_RS_PACKAGE_TEMPLATE_ARCHIVE_URL;
+	if (packageManager === "pnpm" && process.env.NAPI_RS_PACKAGE_TEMPLATE_PNPM_ARCHIVE_URL) return process.env.NAPI_RS_PACKAGE_TEMPLATE_PNPM_ARCHIVE_URL;
+	return TEMPLATE_ARCHIVE_URLS[packageManager];
+}
 async function checkGitCommand() {
 	try {
-		await new Promise((resolve) => {
+		return await new Promise((resolve) => {
 			const cp = exec("git --version");
 			cp.on("error", () => {
 				resolve(false);
 			});
 			cp.on("exit", (code) => {
-				if (code === 0) resolve(true);
-				else resolve(false);
+				resolve(code === 0);
 			});
 		});
-		return true;
 	} catch {
 		return false;
 	}
@@ -2959,39 +2966,67 @@ async function ensureCacheDir(packageManager) {
 	await mkdirAsync(cacheDir, { recursive: true });
 	return cacheDir;
 }
-async function downloadTemplate(packageManager, cacheDir) {
+async function downloadTemplateArchive(packageManager, cacheDir) {
+	const url = getTemplateArchiveUrl(packageManager);
+	const templatePath = path.join(cacheDir, "repo");
+	const tgz = path.join(cacheDir, "napi-rs-template.tgz");
+	await promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
+	await mkdirAsync(templatePath, { recursive: true });
+	const res = await fetch(url, { redirect: "follow" });
+	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
+	const buf = Buffer.from(await res.arrayBuffer());
+	await promises.writeFile(tgz, buf);
+	try {
+		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
+	} finally {
+		await promises.unlink(tgz).catch(() => {});
+	}
+	debug$5(`Template installed from archive: ${url}`);
+}
+async function downloadTemplateWithGit(packageManager, cacheDir) {
 	const repoUrl = TEMPLATE_REPOS[packageManager];
 	const templatePath = path.join(cacheDir, "repo");
 	if (existsSync(templatePath)) {
 		debug$5(`Template cache found at ${templatePath}, updating...`);
-		try {
-			await new Promise((resolve, reject) => {
-				const cp = exec("git fetch origin", { cwd: templatePath });
-				cp.on("error", reject);
-				cp.on("exit", (code) => {
-					if (code === 0) resolve();
-					else reject(/* @__PURE__ */ new Error(`Failed to fetch latest changes, git process exited with code ${code}`));
-				});
+		await new Promise((resolve, reject) => {
+			const cp = exec("git fetch origin", { cwd: templatePath });
+			cp.on("error", reject);
+			cp.on("exit", (code) => {
+				if (code === 0) resolve();
+				else reject(/* @__PURE__ */ new Error(`Failed to fetch latest changes, git process exited with code ${code}`));
 			});
-			execSync("git reset --hard origin/main", {
-				cwd: templatePath,
-				stdio: "ignore"
-			});
-			debug$5("Template updated successfully");
-		} catch (error) {
-			debug$5(`Failed to update template: ${error}`);
-			throw new Error(`Failed to update template from ${repoUrl}: ${error}`);
-		}
+		});
+		execSync("git reset --hard origin/main", {
+			cwd: templatePath,
+			stdio: "ignore"
+		});
+		debug$5("Template updated successfully");
 	} else {
 		debug$5(`Cloning template from ${repoUrl}...`);
+		execSync(`git clone ${repoUrl} repo`, {
+			cwd: cacheDir,
+			stdio: "inherit"
+		});
+		debug$5("Template cloned successfully");
+	}
+}
+async function downloadTemplate(packageManager, cacheDir) {
+	const repoUrl = TEMPLATE_REPOS[packageManager];
+	if (process.env.NAPI_RS_TEMPLATE_USE_ARCHIVE === "1") {
+		debug$5("NAPI_RS_TEMPLATE_USE_ARCHIVE=1, using HTTP archive only");
+		await downloadTemplateArchive(packageManager, cacheDir);
+		return;
+	}
+	try {
+		await downloadTemplateWithGit(packageManager, cacheDir);
+	} catch (error) {
+		debug$5(`Git template failed (${error}), falling back to HTTP archive...`);
 		try {
-			execSync(`git clone ${repoUrl} repo`, {
-				cwd: cacheDir,
-				stdio: "inherit"
-			});
-			debug$5("Template cloned successfully");
-		} catch (error) {
-			throw new Error(`Failed to clone template from ${repoUrl}: ${error}`);
+			const templatePath = path.join(cacheDir, "repo");
+			await promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
+			await downloadTemplateArchive(packageManager, cacheDir);
+		} catch (e2) {
+			throw new Error(`Failed to get template from ${repoUrl} (git and archive both failed): ${error}; archive: ${e2}`);
 		}
 	}
 }
@@ -3110,7 +3145,8 @@ async function newProject(userOptions) {
 	const options = processOptions(userOptions);
 	debug$5("Targets to be enabled:");
 	debug$5(options.targets);
-	if (!await checkGitCommand()) throw new Error("Git is not installed or not available in PATH. Please install Git to continue.");
+	const useArchiveOnly = process.env.NAPI_RS_TEMPLATE_USE_ARCHIVE === "1";
+	if (!useArchiveOnly && !await checkGitCommand()) throw new Error("Git is not installed or not available in PATH. Please install Git to continue, or set NAPI_RS_TEMPLATE_USE_ARCHIVE=1 to download the template via HTTPS+tar.");
 	const packageManager = options.packageManager;
 	await ensurePath(options.path, options.dryRun);
 	if (!options.dryRun) try {
