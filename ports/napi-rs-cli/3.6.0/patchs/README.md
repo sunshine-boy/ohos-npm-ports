@@ -5,7 +5,7 @@
 ## `0001-update-package-json.patch`
 
 - `name` → `@tetcl/napi-rs-cli`（与仓库内其它 port 的 `@tetcl` scope 一致）
-- `version` → `3.6.0-3`（`<上游>-<port rev>`；改 port 时递增）
+- `version` → `3.6.0-4`（`<上游>-<port rev>`；改 port 时递增）
 - `repository.url` → `git+https://github.com/sunshine-boy/ohos-npm-ports.git`
 - `bugs.url` → `https://github.com/sunshine-boy/ohos-npm-ports/issues`
 
@@ -16,7 +16,7 @@
 `napi new` 默认用 `git clone` / `git fetch` 拉取 [package-template](https://github.com/napi-rs/package-template)。在 OpenHarmony 等设备上常因证书、网络或损坏缓存出现 **git 退出码 128**。本补丁：
 
 - 修正 `checkGitCommand()`（原先几乎总判定为「有 git」）。
-- **git 失败时**自动改用 HTTPS 下载 `main` 分支的 **`.tar.gz`**，并用系统 **`tar -xzf`** 解压到模板缓存（需 `tar` 在 `PATH`）。
+- **git 失败时**自动改用 HTTPS 下载 `main` 分支的 **`.tar.gz`**，并用 **`tar -xzf … -C <临时目录>`** 解压（仅 POSIX 常见选项，**不用** GNU 的 `--strip-components`，以便 **BusyBox tar** 在 OpenHarmony 上可用）；再用 Node 把归档内**唯一顶层目录**移到 `repo/`。跨盘符 `rename` 失败时会 `fs.cp` 回退。
 - 环境变量（可选）：
   - **`NAPI_RS_TEMPLATE_USE_ARCHIVE=1`**：跳过 git，只用归档（无 git 也可用）。
   - **`NAPI_RS_PACKAGE_TEMPLATE_ARCHIVE_URL`** / **`NAPI_RS_PACKAGE_TEMPLATE_PNPM_ARCHIVE_URL`**：覆盖 yarn / pnpm 模板归档 URL（便于镜像站）。

@@ -77,6 +77,8 @@ async function checkGitCommand(): Promise<boolean> {
 /**
  * Download template without git (uses global fetch + system `tar`).
  * Set NAPI_RS_TEMPLATE_USE_ARCHIVE=1 to skip git entirely on constrained devices.
+ *
+ * Extraction avoids GNU-only `tar --strip-components` (BusyBox tar on OpenHarmony rejects it).
  */
 async function downloadTemplateArchive(
   packageManager: SupportedPackageManager,
@@ -85,8 +87,10 @@ async function downloadTemplateArchive(
   const url = getTemplateArchiveUrl(packageManager)
   const templatePath = path.join(cacheDir, 'repo')
   const tgz = path.join(cacheDir, 'napi-rs-template.tgz')
+  const extractDir = path.join(cacheDir, 'napi-rs-template-extract')
   await fs.rm(templatePath, { recursive: true, force: true }).catch(() => {})
-  await mkdirAsync(templatePath, { recursive: true })
+  await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {})
+  await mkdirAsync(extractDir, { recursive: true })
   const res = await fetch(url, { redirect: 'follow' })
   if (!res.ok) {
     throw new Error(
@@ -96,11 +100,28 @@ async function downloadTemplateArchive(
   const buf = Buffer.from(await res.arrayBuffer())
   await fs.writeFile(tgz, buf)
   try {
-    execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, {
-      stdio: 'inherit',
-    })
+    execSync(
+      `tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`,
+      { stdio: 'inherit' },
+    )
+    const entries = await fs.readdir(extractDir, { withFileTypes: true })
+    const topDirs = entries.filter((e) => e.isDirectory())
+    if (topDirs.length !== 1) {
+      const names = entries.map((e) => e.name).join(', ')
+      throw new Error(
+        `Template archive must contain exactly one top-level directory; got: ${names || '(empty)'}`,
+      )
+    }
+    const inner = path.join(extractDir, topDirs[0]!.name)
+    try {
+      await fs.rename(inner, templatePath)
+    } catch {
+      await fs.cp(inner, templatePath, { recursive: true })
+      await fs.rm(inner, { recursive: true, force: true })
+    }
   } finally {
     await fs.unlink(tgz).catch(() => {})
+    await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {})
   }
   debug(`Template installed from archive: ${url}`)
 }

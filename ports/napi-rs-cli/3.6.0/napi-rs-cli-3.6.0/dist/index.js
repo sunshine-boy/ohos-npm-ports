@@ -2970,16 +2970,32 @@ async function downloadTemplateArchive(packageManager, cacheDir) {
 	const url = getTemplateArchiveUrl(packageManager);
 	const templatePath = path.join(cacheDir, "repo");
 	const tgz = path.join(cacheDir, "napi-rs-template.tgz");
+	const extractDir = path.join(cacheDir, "napi-rs-template-extract");
 	await promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
-	await mkdirAsync(templatePath, { recursive: true });
+	await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+	await mkdirAsync(extractDir, { recursive: true });
 	const res = await fetch(url, { redirect: "follow" });
 	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
 	const buf = Buffer.from(await res.arrayBuffer());
 	await promises.writeFile(tgz, buf);
 	try {
-		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
+		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`, { stdio: "inherit" });
+		const entries = await promises.readdir(extractDir, { withFileTypes: true });
+		const topDirs = entries.filter((e) => e.isDirectory());
+		if (topDirs.length !== 1) {
+			const names = entries.map((e) => e.name).join(", ");
+			throw new Error(`Template archive must contain exactly one top-level directory; got: ${names || "(empty)"}`);
+		}
+		const inner = path.join(extractDir, topDirs[0].name);
+		try {
+			await promises.rename(inner, templatePath);
+		} catch {
+			await promises.cp(inner, templatePath, { recursive: true });
+			await promises.rm(inner, { recursive: true, force: true });
+		}
 	} finally {
 		await promises.unlink(tgz).catch(() => {});
+		await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
 	}
 	debug$5(`Template installed from archive: ${url}`);
 }

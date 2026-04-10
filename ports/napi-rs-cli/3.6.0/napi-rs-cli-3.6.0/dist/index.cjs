@@ -2996,16 +2996,32 @@ async function downloadTemplateArchive(packageManager, cacheDir) {
 	const url = getTemplateArchiveUrl(packageManager);
 	const templatePath = node_path.default.join(cacheDir, "repo");
 	const tgz = node_path.default.join(cacheDir, "napi-rs-template.tgz");
+	const extractDir = node_path.default.join(cacheDir, "napi-rs-template-extract");
 	await node_fs.promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
-	await mkdirAsync(templatePath, { recursive: true });
+	await node_fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+	await mkdirAsync(extractDir, { recursive: true });
 	const res = await fetch(url, { redirect: "follow" });
 	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
 	const buf = Buffer.from(await res.arrayBuffer());
 	await node_fs.promises.writeFile(tgz, buf);
 	try {
-		(0, node_child_process.execSync)(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
+		(0, node_child_process.execSync)(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`, { stdio: "inherit" });
+		const entries = await node_fs.promises.readdir(extractDir, { withFileTypes: true });
+		const topDirs = entries.filter((e) => e.isDirectory());
+		if (topDirs.length !== 1) {
+			const names = entries.map((e) => e.name).join(", ");
+			throw new Error(`Template archive must contain exactly one top-level directory; got: ${names || "(empty)"}`);
+		}
+		const inner = node_path.default.join(extractDir, topDirs[0].name);
+		try {
+			await node_fs.promises.rename(inner, templatePath);
+		} catch {
+			await node_fs.promises.cp(inner, templatePath, { recursive: true });
+			await node_fs.promises.rm(inner, { recursive: true, force: true });
+		}
 	} finally {
 		await node_fs.promises.unlink(tgz).catch(() => {});
+		await node_fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
 	}
 	debug$5(`Template installed from archive: ${url}`);
 }

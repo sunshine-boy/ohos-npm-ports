@@ -1,5 +1,5 @@
 diff --git a/dist/cli.js b/dist/cli.js
-index e02c78a..c93a203 100755
+index e02c78a..162f7ca 100755
 --- a/dist/cli.js
 +++ b/dist/cli.js
 @@ -2938,19 +2938,26 @@ const TEMPLATE_REPOS = {
@@ -33,7 +33,7 @@ index e02c78a..c93a203 100755
  	} catch {
  		return false;
  	}
-@@ -2960,39 +2967,67 @@ async function ensureCacheDir(packageManager) {
+@@ -2960,39 +2967,83 @@ async function ensureCacheDir(packageManager) {
  	await mkdirAsync(cacheDir, { recursive: true });
  	return cacheDir;
  }
@@ -42,16 +42,32 @@ index e02c78a..c93a203 100755
 +	const url = getTemplateArchiveUrl(packageManager);
 +	const templatePath = path.join(cacheDir, "repo");
 +	const tgz = path.join(cacheDir, "napi-rs-template.tgz");
++	const extractDir = path.join(cacheDir, "napi-rs-template-extract");
 +	await promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
-+	await mkdirAsync(templatePath, { recursive: true });
++	await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
++	await mkdirAsync(extractDir, { recursive: true });
 +	const res = await fetch(url, { redirect: "follow" });
 +	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
 +	const buf = Buffer.from(await res.arrayBuffer());
 +	await promises.writeFile(tgz, buf);
 +	try {
-+		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
++		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`, { stdio: "inherit" });
++		const entries = await promises.readdir(extractDir, { withFileTypes: true });
++		const topDirs = entries.filter((e) => e.isDirectory());
++		if (topDirs.length !== 1) {
++			const names = entries.map((e) => e.name).join(", ");
++			throw new Error(`Template archive must contain exactly one top-level directory; got: ${names || "(empty)"}`);
++		}
++		const inner = path.join(extractDir, topDirs[0].name);
++		try {
++			await promises.rename(inner, templatePath);
++		} catch {
++			await promises.cp(inner, templatePath, { recursive: true });
++			await promises.rm(inner, { recursive: true, force: true });
++		}
 +	} finally {
 +		await promises.unlink(tgz).catch(() => {});
++		await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
 +	}
 +	debug$5(`Template installed from archive: ${url}`);
 +}
@@ -126,7 +142,7 @@ index e02c78a..c93a203 100755
  		}
  	}
  }
-@@ -3111,7 +3146,8 @@ async function newProject(userOptions) {
+@@ -3111,7 +3162,8 @@ async function newProject(userOptions) {
  	const options = processOptions(userOptions);
  	debug$5("Targets to be enabled:");
  	debug$5(options.targets);
@@ -137,7 +153,7 @@ index e02c78a..c93a203 100755
  	await ensurePath(options.path, options.dryRun);
  	if (!options.dryRun) try {
 diff --git a/dist/index.js b/dist/index.js
-index b592e25..98f7c6b 100644
+index b592e25..0a38793 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -2937,19 +2937,26 @@ const TEMPLATE_REPOS = {
@@ -171,7 +187,7 @@ index b592e25..98f7c6b 100644
  	} catch {
  		return false;
  	}
-@@ -2959,39 +2966,67 @@ async function ensureCacheDir(packageManager) {
+@@ -2959,39 +2966,83 @@ async function ensureCacheDir(packageManager) {
  	await mkdirAsync(cacheDir, { recursive: true });
  	return cacheDir;
  }
@@ -180,16 +196,32 @@ index b592e25..98f7c6b 100644
 +	const url = getTemplateArchiveUrl(packageManager);
 +	const templatePath = path.join(cacheDir, "repo");
 +	const tgz = path.join(cacheDir, "napi-rs-template.tgz");
++	const extractDir = path.join(cacheDir, "napi-rs-template-extract");
 +	await promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
-+	await mkdirAsync(templatePath, { recursive: true });
++	await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
++	await mkdirAsync(extractDir, { recursive: true });
 +	const res = await fetch(url, { redirect: "follow" });
 +	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
 +	const buf = Buffer.from(await res.arrayBuffer());
 +	await promises.writeFile(tgz, buf);
 +	try {
-+		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
++		execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`, { stdio: "inherit" });
++		const entries = await promises.readdir(extractDir, { withFileTypes: true });
++		const topDirs = entries.filter((e) => e.isDirectory());
++		if (topDirs.length !== 1) {
++			const names = entries.map((e) => e.name).join(", ");
++			throw new Error(`Template archive must contain exactly one top-level directory; got: ${names || "(empty)"}`);
++		}
++		const inner = path.join(extractDir, topDirs[0].name);
++		try {
++			await promises.rename(inner, templatePath);
++		} catch {
++			await promises.cp(inner, templatePath, { recursive: true });
++			await promises.rm(inner, { recursive: true, force: true });
++		}
 +	} finally {
 +		await promises.unlink(tgz).catch(() => {});
++		await promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
 +	}
 +	debug$5(`Template installed from archive: ${url}`);
 +}
@@ -264,7 +296,7 @@ index b592e25..98f7c6b 100644
  		}
  	}
  }
-@@ -3110,7 +3145,8 @@ async function newProject(userOptions) {
+@@ -3110,7 +3161,8 @@ async function newProject(userOptions) {
  	const options = processOptions(userOptions);
  	debug$5("Targets to be enabled:");
  	debug$5(options.targets);
@@ -275,7 +307,7 @@ index b592e25..98f7c6b 100644
  	await ensurePath(options.path, options.dryRun);
  	if (!options.dryRun) try {
 diff --git a/dist/index.cjs b/dist/index.cjs
-index b4ccb71..3a2e379 100644
+index b4ccb71..fda35b3 100644
 --- a/dist/index.cjs
 +++ b/dist/index.cjs
 @@ -2963,19 +2963,26 @@ const TEMPLATE_REPOS = {
@@ -309,7 +341,7 @@ index b4ccb71..3a2e379 100644
  	} catch {
  		return false;
  	}
-@@ -2985,39 +2992,67 @@ async function ensureCacheDir(packageManager) {
+@@ -2985,39 +2992,83 @@ async function ensureCacheDir(packageManager) {
  	await mkdirAsync(cacheDir, { recursive: true });
  	return cacheDir;
  }
@@ -318,16 +350,32 @@ index b4ccb71..3a2e379 100644
 +	const url = getTemplateArchiveUrl(packageManager);
 +	const templatePath = node_path.default.join(cacheDir, "repo");
 +	const tgz = node_path.default.join(cacheDir, "napi-rs-template.tgz");
++	const extractDir = node_path.default.join(cacheDir, "napi-rs-template-extract");
 +	await node_fs.promises.rm(templatePath, { recursive: true, force: true }).catch(() => {});
-+	await mkdirAsync(templatePath, { recursive: true });
++	await node_fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
++	await mkdirAsync(extractDir, { recursive: true });
 +	const res = await fetch(url, { redirect: "follow" });
 +	if (!res.ok) throw new Error(`Failed to download template archive (${res.status} ${res.statusText}): ${url}`);
 +	const buf = Buffer.from(await res.arrayBuffer());
 +	await node_fs.promises.writeFile(tgz, buf);
 +	try {
-+		(0, node_child_process.execSync)(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, { stdio: "inherit" });
++		(0, node_child_process.execSync)(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`, { stdio: "inherit" });
++		const entries = await node_fs.promises.readdir(extractDir, { withFileTypes: true });
++		const topDirs = entries.filter((e) => e.isDirectory());
++		if (topDirs.length !== 1) {
++			const names = entries.map((e) => e.name).join(", ");
++			throw new Error(`Template archive must contain exactly one top-level directory; got: ${names || "(empty)"}`);
++		}
++		const inner = node_path.default.join(extractDir, topDirs[0].name);
++		try {
++			await node_fs.promises.rename(inner, templatePath);
++		} catch {
++			await node_fs.promises.cp(inner, templatePath, { recursive: true });
++			await node_fs.promises.rm(inner, { recursive: true, force: true });
++		}
 +	} finally {
 +		await node_fs.promises.unlink(tgz).catch(() => {});
++		await node_fs.promises.rm(extractDir, { recursive: true, force: true }).catch(() => {});
 +	}
 +	debug$5(`Template installed from archive: ${url}`);
 +}
@@ -402,7 +450,7 @@ index b4ccb71..3a2e379 100644
  		}
  	}
  }
-@@ -3136,7 +3171,8 @@ async function newProject(userOptions) {
+@@ -3136,7 +3187,8 @@ async function newProject(userOptions) {
  	const options = processOptions(userOptions);
  	debug$5("Targets to be enabled:");
  	debug$5(options.targets);
@@ -413,10 +461,10 @@ index b4ccb71..3a2e379 100644
  	await ensurePath(options.path, options.dryRun);
  	if (!options.dryRun) try {
 diff --git a/src/api/new.ts b/src/api/new.ts
-index 4860742..0378890 100644
+index 4860742..6764d1d 100644
 --- a/src/api/new.ts
 +++ b/src/api/new.ts
-@@ -33,27 +33,78 @@ const TEMPLATE_REPOS = {
+@@ -33,27 +33,99 @@ const TEMPLATE_REPOS = {
    pnpm: 'https://github.com/napi-rs/package-template-pnpm',
  } as const
  
@@ -471,6 +519,8 @@ index 4860742..0378890 100644
 +/**
 + * Download template without git (uses global fetch + system `tar`).
 + * Set NAPI_RS_TEMPLATE_USE_ARCHIVE=1 to skip git entirely on constrained devices.
++ *
++ * Extraction avoids GNU-only `tar --strip-components` (BusyBox tar on OpenHarmony rejects it).
 + */
 +async function downloadTemplateArchive(
 +  packageManager: SupportedPackageManager,
@@ -479,8 +529,10 @@ index 4860742..0378890 100644
 +  const url = getTemplateArchiveUrl(packageManager)
 +  const templatePath = path.join(cacheDir, 'repo')
 +  const tgz = path.join(cacheDir, 'napi-rs-template.tgz')
++  const extractDir = path.join(cacheDir, 'napi-rs-template-extract')
 +  await fs.rm(templatePath, { recursive: true, force: true }).catch(() => {})
-+  await mkdirAsync(templatePath, { recursive: true })
++  await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {})
++  await mkdirAsync(extractDir, { recursive: true })
 +  const res = await fetch(url, { redirect: 'follow' })
 +  if (!res.ok) {
 +    throw new Error(
@@ -490,11 +542,28 @@ index 4860742..0378890 100644
 +  const buf = Buffer.from(await res.arrayBuffer())
 +  await fs.writeFile(tgz, buf)
 +  try {
-+    execSync(`tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(templatePath)} --strip-components=1`, {
-+      stdio: 'inherit',
-+    })
++    execSync(
++      `tar -xzf ${JSON.stringify(tgz)} -C ${JSON.stringify(extractDir)}`,
++      { stdio: 'inherit' },
++    )
++    const entries = await fs.readdir(extractDir, { withFileTypes: true })
++    const topDirs = entries.filter((e) => e.isDirectory())
++    if (topDirs.length !== 1) {
++      const names = entries.map((e) => e.name).join(', ')
++      throw new Error(
++        `Template archive must contain exactly one top-level directory; got: ${names || '(empty)'}`,
++      )
++    }
++    const inner = path.join(extractDir, topDirs[0]!.name)
++    try {
++      await fs.rename(inner, templatePath)
++    } catch {
++      await fs.cp(inner, templatePath, { recursive: true })
++      await fs.rm(inner, { recursive: true, force: true })
++    }
 +  } finally {
 +    await fs.unlink(tgz).catch(() => {})
++    await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {})
 +  }
 +  debug(`Template installed from archive: ${url}`)
 +}
@@ -502,7 +571,7 @@ index 4860742..0378890 100644
  async function ensureCacheDir(
    packageManager: SupportedPackageManager,
  ): Promise<string> {
-@@ -62,7 +113,7 @@ async function ensureCacheDir(
+@@ -62,7 +134,7 @@ async function ensureCacheDir(
    return cacheDir
  }
  
@@ -511,7 +580,7 @@ index 4860742..0378890 100644
    packageManager: SupportedPackageManager,
    cacheDir: string,
  ): Promise<void> {
-@@ -71,39 +122,57 @@ async function downloadTemplate(
+@@ -71,39 +143,57 @@ async function downloadTemplate(
  
    if (existsSync(templatePath)) {
      debug(`Template cache found at ${templatePath}, updating...`)
@@ -598,7 +667,7 @@ index 4860742..0378890 100644
      }
    }
  }
-@@ -343,10 +412,10 @@ export async function newProject(userOptions: RawNewOptions) {
+@@ -343,10 +433,10 @@ export async function newProject(userOptions: RawNewOptions) {
    debug('Targets to be enabled:')
    debug(options.targets)
  
