@@ -20,6 +20,7 @@ tar -zxf "${TARBALL}"
 cd "${SRC_DIR}"
 
 patch -p1 < ../patchs/0001-openharmony-platform.patch
+patch -p1 < ../patchs/0002-gyp-env-sanitize-ohos-llvm.patch
 
 cd ..
 rm -f "${TARBALL}"

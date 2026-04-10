@@ -1,0 +1,138 @@
+diff --git a/lib/util/compile.js b/lib/util/compile.js
+index c60455a..5317c91 100644
+--- a/lib/util/compile.js
++++ b/lib/util/compile.js
+@@ -7,6 +7,8 @@ const path = require('path');
+ const win = process.platform === 'win32';
+ const existsSync = fs.existsSync || path.existsSync;
+ const cp = require('child_process');
++const log = require('./log.js');
++const versioning = require('./versioning.js');
+ 
+ // try to build up the complete path to node-gyp
+ /* priority:
+@@ -60,6 +62,103 @@ function which_node_gyp() {
+   }
+ }
+ 
++function firstAbsolutePathToken(value) {
++  if (!value || typeof value !== 'string') {
++    return '';
++  }
++  const t = value.trim().split(/\s+/)[0];
++  if (t.startsWith('/')) {
++    return t;
++  }
++  return '';
++}
++
++function envCompilerPathIsBroken(value) {
++  const p = firstAbsolutePathToken(value);
++  if (!p) {
++    return false;
++  }
++  return !existsSync(p);
++}
++
++function sanitizeCompilerEnvForGyp(env) {
++  const out = Object.assign({}, env);
++  const keys = [
++    'CC', 'CXX', 'LD', 'LINK', 'AR', 'AS', 'NM',
++    'npm_config_cc', 'npm_config_cxx', 'npm_config_ld',
++    'CC_host', 'CXX_host', 'CC_target', 'CXX_target',
++  ];
++  const removed = [];
++  for (const k of keys) {
++    if (out[k] && envCompilerPathIsBroken(out[k])) {
++      removed.push(k + '=' + String(out[k]).slice(0, 120));
++      delete out[k];
++    }
++  }
++  if (removed.length) {
++    log.warn('Removed stale compiler settings (binary path missing on this host): ' + removed.join('; '));
++  }
++  return out;
++}
++
++function resolveOhosLlvmBin() {
++  if (process.env.OHOS_SDK_NATIVE_LLVM_BIN && existsSync(process.env.OHOS_SDK_NATIVE_LLVM_BIN)) {
++    return process.env.OHOS_SDK_NATIVE_LLVM_BIN;
++  }
++  if (process.env.OHOS_SDK_ROOT) {
++    const root = process.env.OHOS_SDK_ROOT;
++    const fromRoot = [
++      path.join(root, 'linux', 'native', 'llvm', 'bin'),
++      path.join(root, 'ohos-sdk', 'linux', 'native', 'llvm', 'bin'),
++    ];
++    for (const d of fromRoot) {
++      if (existsSync(d)) {
++        return d;
++      }
++    }
++  }
++  if (process.env.OHOS_SDK_LLVM_CLANG) {
++    const d = path.dirname(process.env.OHOS_SDK_LLVM_CLANG);
++    if (existsSync(d)) {
++      return d;
++    }
++  }
++  if (process.env.OHOS_SDK_OHOS_DIR) {
++    const d = path.join(process.env.OHOS_SDK_OHOS_DIR, 'native', 'llvm', 'bin');
++    if (existsSync(d)) {
++      return d;
++    }
++  }
++  const fallback = '/opt/ohos-sdk/ohos/native/llvm/bin';
++  if (existsSync(fallback)) {
++    return fallback;
++  }
++  return '';
++}
++
++function applyOpenHarmonyToolchainDefaults(env) {
++  const onOh =
++    process.platform === 'openharmony' ||
++    (typeof versioning.host_seems_openharmony === 'function' && versioning.host_seems_openharmony());
++  if (!onOh) {
++    return env;
++  }
++  const cxxP = firstAbsolutePathToken(env.CXX || '');
++  const ccP = firstAbsolutePathToken(env.CC || '');
++  if (cxxP && existsSync(cxxP) && ccP && existsSync(ccP)) {
++    return env;
++  }
++  const bin = resolveOhosLlvmBin();
++  if (!bin) {
++    return env;
++  }
++  const cxx = path.join(bin, 'clang++');
++  const cc = path.join(bin, 'clang');
++  if (existsSync(cxx)) {
++    env.CXX = cxx;
++  }
++  if (existsSync(cc)) {
++    env.CC = cc;
++  }
++  if (env.CXX || env.CC) {
++    log.info('Using OpenHarmony llvm from ' + bin);
++  }
++  return env;
++}
++
++function envForNodeGyp() {
++  const env = sanitizeCompilerEnvForGyp(process.env);
++  return applyOpenHarmonyToolchainDefaults(env);
++}
++
+ module.exports.run_gyp = function(args, opts, callback) {
+   let shell_cmd = '';
+   const cmd_args = [];
+@@ -77,7 +176,7 @@ module.exports.run_gyp = function(args, opts, callback) {
+     }
+   }
+   const final_args = cmd_args.concat(args);
+-  const cmd = cp.spawn(shell_cmd, final_args, { cwd: undefined, env: process.env, stdio: [0, 1, 2] });
++  const cmd = cp.spawn(shell_cmd, final_args, { cwd: undefined, env: envForNodeGyp(), stdio: [0, 1, 2] });
+   cmd.on('error', (err) => {
+     if (err) {
+       return callback(new Error("Failed to execute '" + shell_cmd + ' ' + final_args.join(' ') + "' (" + err + ')'));

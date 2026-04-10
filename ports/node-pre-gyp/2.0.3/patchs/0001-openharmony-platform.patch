@@ -105,7 +105,7 @@ index e1b9e6c..20e6291 100644
 +  "name": "@tetcl/node-pre-gyp",
    "description": "Node.js native addon binary install tool",
 -  "version": "2.0.3",
-+  "version": "2.0.3-1",
++  "version": "2.0.3-3",
    "keywords": [
      "native",
      "addon",
