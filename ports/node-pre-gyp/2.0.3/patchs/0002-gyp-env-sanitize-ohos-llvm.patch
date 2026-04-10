@@ -2,7 +2,7 @@ diff --git a/lib/util/compile.js b/lib/util/compile.js
 index c60455a..3e46e4c 100644
 --- a/lib/util/compile.js
 +++ b/lib/util/compile.js
-@@ -1,93 +1,204 @@
+@@ -1,93 +1,210 @@
  'use strict';
  
  module.exports = exports;
@@ -142,15 +142,21 @@ index c60455a..3e46e4c 100644
 +}
 +
 +function applyOpenHarmonyToolchainDefaults(env) {
-+  const onOh =
-+    process.platform === 'openharmony' ||
-+    (typeof versioning.host_seems_openharmony === 'function' && versioning.host_seems_openharmony());
-+  if (!onOh) {
-+    return env;
-+  }
 +  const cxxP = firstAbsolutePathToken(env.CXX || '');
 +  const ccP = firstAbsolutePathToken(env.CC || '');
 +  if (cxxP && existsSync(cxxP) && ccP && existsSync(ccP)) {
++    return env;
++  }
++  const onOh =
++    process.platform === 'openharmony' ||
++    (typeof versioning.host_seems_openharmony === 'function' && versioning.host_seems_openharmony());
++  const ohSdkHints = !!(
++    process.env.OHOS_SDK_ROOT ||
++    process.env.OHOS_SDK_OHOS_DIR ||
++    process.env.OHOS_SDK_LLVM_CLANG ||
++    process.env.OHOS_SDK_NATIVE_LLVM_BIN
++  );
++  if (!onOh && !(process.platform === 'linux' && ohSdkHints)) {
 +    return env;
 +  }
 +  const bin = resolveOhosLlvmBin();

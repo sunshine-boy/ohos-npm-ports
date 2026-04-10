@@ -18,7 +18,7 @@ diff --git a/lib/util/versioning.js b/lib/util/versioning.js
 index b69b367..bec9f47 100644
 --- a/lib/util/versioning.js
 +++ b/lib/util/versioning.js
-@@ -271,6 +271,57 @@ function get_process_runtime(versions) {
+@@ -271,6 +271,66 @@ function get_process_runtime(versions) {
  
  module.exports.get_process_runtime = get_process_runtime;
  
@@ -43,8 +43,17 @@ index b69b367..bec9f47 100644
 +  if (process.platform !== 'linux') {
 +    return false;
 +  }
++  try {
++    const rk = require('os').release().toLowerCase();
++    if (rk.includes('harmonyos') || rk.includes('openharmony') || rk.includes('hongmeng')) {
++      return true;
++    }
++  } catch (_) {
++    // ignore
++  }
 +  const rel = read_os_release_contents().toLowerCase();
-+  return /^id=openharmony\b/m.test(rel) || /^id=ohos\b/m.test(rel);
++  return /^id=openharmony\b/m.test(rel) || /^id=ohos\b/m.test(rel) ||
++    /\bopenharmony\b/.test(rel) || /\bohos\b/.test(rel);
 +}
 +module.exports.host_seems_openharmony = host_seems_openharmony;
 +
@@ -76,7 +85,7 @@ index b69b367..bec9f47 100644
  const default_package_name = '{module_name}-v{version}-{node_abi}-{platform}-{arch}.tar.gz';
  const default_remote_path = '';
  
-@@ -280,6 +331,7 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
+@@ -280,6 +340,7 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
    const v = package_json.version;
    const module_version = semver.parse(v);
    const runtime = options.runtime || get_process_runtime(process.versions);
@@ -84,7 +93,7 @@ index b69b367..bec9f47 100644
    const opts = {
      name: package_json.name,
      configuration: options.debug ? 'Debug' : 'Release',
-@@ -298,8 +350,8 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
+@@ -298,8 +359,8 @@ module.exports.evaluate = function(package_json, options, napi_build_version) {
      napi_build_version: napi_build_version || '',
      node_napi_label: napi_build_version ? 'napi-v' + napi_build_version : get_runtime_abi(runtime, options.target),
      target: options.target || '',
@@ -105,19 +114,25 @@ index e1b9e6c..20e6291 100644
 +  "name": "@tetcl/node-pre-gyp",
    "description": "Node.js native addon binary install tool",
 -  "version": "2.0.3",
-+  "version": "2.0.3-4",
++  "version": "2.0.3-5",
    "keywords": [
      "native",
      "addon",
-@@ -15,7 +15,10 @@
+@@ -15,7 +15,7 @@
    "author": "Dane Springmeyer <dane@mapbox.com>",
    "repository": {
      "type": "git",
 -    "url": "git://github.com/mapbox/node-pre-gyp.git"
 +    "url": "git+https://github.com/sunshine-boy/ohos-npm-ports.git"
-+  },
-+  "bugs": {
-+    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
    },
    "bin": "./bin/node-pre-gyp",
    "main": "./lib/node-pre-gyp.js",
+@@ -64,5 +64,8 @@
+   },
+   "overrides": {
+     "js-yaml": "^3.14.2"
++  },
++  "bugs": {
++    "url": "https://github.com/sunshine-boy/ohos-npm-ports/issues"
+   }
+ }
